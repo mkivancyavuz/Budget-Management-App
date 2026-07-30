@@ -1,4 +1,4 @@
-// Server component shown instead of the whole app when NEXT_PUBLIC_SUPABASE_URL /
+// Server component shown instead of the whole app when NEXT_PUBLIC_SUPABASE_ANON_KEY /
 // NEXT_PUBLIC_SUPABASE_ANON_KEY aren't set. Without them, createBrowserClient()
 // throws immediately — better to explain what's missing than crash with a
 // generic runtime error.
