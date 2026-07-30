@@ -1,0 +1,177 @@
+@import "tailwindcss";
+
+/* Dark theme is the default (matches the app's original design). Light theme
+   overrides every token under :root[data-theme="light"]. Nothing here is ever
+   read from the URL — the active theme is only ever set via the data-theme
+   attribute on <html>, driven by lib/theme.tsx from localStorage. */
+:root {
+  --bg: #09090b;
+  --surface: #111113;
+  --surface-2: #17171a;
+  --accent: #6366f1;
+  --accent-soft: #6366f11f;
+  --success: #22c55e;
+  --success-soft: #22c55e1f;
+  --warning: #f59e0b;
+  --warning-soft: #f59e0b1f;
+  --danger: #ef4444;
+  --danger-soft: #ef44441f;
+  --text: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --border: #ffffff14;
+  --border-strong: #ffffff26;
+  --glass: rgba(255, 255, 255, 0.03);
+  --glass-hover: rgba(255, 255, 255, 0.045);
+  --glass-strong: rgba(255, 255, 255, 0.06);
+  --glass-subtle: rgba(255, 255, 255, 0.05);
+  --overlay: rgba(0, 0, 0, 0.6);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --accent: #6366f1;
+  --accent-soft: #6366f114;
+  --success: #16a34a;
+  --success-soft: #22c55e14;
+  --warning: #d97706;
+  --warning-soft: #f59e0b14;
+  --danger: #dc2626;
+  --danger-soft: #ef444414;
+  --text: #09090b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --border: #00000014;
+  --border-strong: #00000024;
+  --glass: rgba(0, 0, 0, 0.025);
+  --glass-hover: rgba(0, 0, 0, 0.04);
+  --glass-strong: rgba(0, 0, 0, 0.05);
+  --glass-subtle: rgba(0, 0, 0, 0.035);
+  --overlay: rgba(15, 15, 20, 0.4);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+}
+
+@theme inline {
+  --color-app-bg: var(--bg);
+  --color-app-surface: var(--surface);
+  --color-app-surface-2: var(--surface-2);
+  --color-app-accent: var(--accent);
+  --color-app-accent-soft: var(--accent-soft);
+  --color-app-success: var(--success);
+  --color-app-success-soft: var(--success-soft);
+  --color-app-warning: var(--warning);
+  --color-app-warning-soft: var(--warning-soft);
+  --color-app-danger: var(--danger);
+  --color-app-danger-soft: var(--danger-soft);
+  --color-app-text: var(--text);
+  --color-app-text-secondary: var(--text-secondary);
+  --color-app-text-muted: var(--text-muted);
+  --color-app-border: var(--border);
+  --color-app-border-strong: var(--border-strong);
+  --color-glass: var(--glass);
+  --color-glass-hover: var(--glass-hover);
+  --color-glass-strong: var(--glass-strong);
+  --color-glass-subtle: var(--glass-subtle);
+  --color-overlay: var(--overlay);
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.011em;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+::selection {
+  background: #6366f1;
+  color: #fff;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.bar-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  animation: shimmer 2.4s ease-in-out infinite;
+}
+
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+}
+
+input[type="date"] {
+  color-scheme: dark;
+}
+:root[data-theme="light"] input[type="date"] {
+  color-scheme: light;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) brightness(1.4);
+  opacity: 0.8;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 3px;
+  margin-right: -2px;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+:root[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.55;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: rgba(99, 102, 241, 0.18);
+}
