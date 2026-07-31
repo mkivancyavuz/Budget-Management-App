@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { LogOut, Trash2, Upload } from "lucide-react";
+import { LogOut, Trash2, Upload, Camera } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import { AVATAR_COLORS, avatarInfo, displayIdentity } from "@/lib/profile";
@@ -34,23 +34,17 @@ export default function ProfilePage() {
 
   const currentAvatar = avatarInfo(user);
 
-  // Edit profile (username + fallback-avatar color/initials, saved together)
+  // Edit profile (username)
   const [username, setUsername] = useState((user?.user_metadata?.username as string) ?? "");
-  const [avatarColor, setAvatarColor] = useState(currentAvatar.color);
-  const [avatarInitials, setAvatarInitials] = useState(
-    (user?.user_metadata?.avatar_initials as string) ?? ""
-  );
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
 
-  // user loads asynchronously (see lib/auth.tsx) — sync the fields once it
-  // arrives instead of leaving them stuck on the empty initial state.
+  // user loads asynchronously (see lib/auth.tsx) — sync the field once it
+  // arrives instead of leaving it stuck on the empty initial state.
   useEffect(() => {
     if (!user) return;
     setUsername((user.user_metadata?.username as string) ?? "");
-    setAvatarColor(avatarInfo(user).color);
-    setAvatarInitials((user.user_metadata?.avatar_initials as string) ?? "");
   }, [user]);
 
   async function handleSaveProfile(e: React.FormEvent) {
@@ -66,11 +60,7 @@ export default function ProfilePage() {
       const res = await fetch("/api/account/update-profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: username.trim(),
-          avatarColor,
-          avatarInitials: avatarInitials.trim(),
-        }),
+        body: JSON.stringify({ username: username.trim() }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || body.error) {
@@ -86,10 +76,25 @@ export default function ProfilePage() {
     }
   }
 
-  // Profile photo upload / removal
+  // Profile photo — all editing lives behind the small button on the corner of
+  // the avatar, so landing on this page shows the profile rather than a form.
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarColor, setAvatarColor] = useState(currentAvatar.color);
+  const [avatarInitials, setAvatarInitials] = useState(
+    (user?.user_metadata?.avatar_initials as string) ?? ""
+  );
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  function openAvatarModal() {
+    // Seed the form from whatever is currently saved, so reopening after a
+    // cancelled edit doesn't show stale values.
+    setAvatarColor(avatarInfo(user).color);
+    setAvatarInitials((user?.user_metadata?.avatar_initials as string) ?? "");
+    setAvatarError(null);
+    setAvatarModalOpen(true);
+  }
 
   function avatarErrorMessage(code: string | undefined, fallback: string) {
     if (code === "invalid_type") return t("err_avatar_invalid_type");
@@ -109,6 +114,7 @@ export default function ProfilePage() {
         setAvatarError(avatarErrorMessage(body.error, res.statusText));
       } else {
         await refresh();
+        setAvatarModalOpen(false);
       }
     } catch (e) {
       setAvatarError(avatarErrorMessage(undefined, e instanceof Error ? e.message : String(e)));
@@ -128,6 +134,30 @@ export default function ProfilePage() {
         setAvatarError(avatarErrorMessage(body.error, res.statusText));
       } else {
         await refresh();
+      }
+    } catch (e) {
+      setAvatarError(avatarErrorMessage(undefined, e instanceof Error ? e.message : String(e)));
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  // Saves just the fallback avatar's color/initials (used when no photo is set).
+  async function handleSaveAvatarStyle() {
+    setAvatarError(null);
+    setAvatarBusy(true);
+    try {
+      const res = await fetch("/api/account/update-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatarColor, avatarInitials: avatarInitials.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.error) {
+        setAvatarError(avatarErrorMessage(body.error, res.statusText));
+      } else {
+        await refresh();
+        setAvatarModalOpen(false);
       }
     } catch (e) {
       setAvatarError(avatarErrorMessage(undefined, e instanceof Error ? e.message : String(e)));
@@ -233,56 +263,31 @@ export default function ProfilePage() {
           in a responsive grid so wide monitors show two or three side by side
           instead of one narrow column hugging the left edge. */}
       <Card>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-          <div className="flex items-center gap-5 min-w-0 flex-1">
+        <div className="flex items-center gap-5 min-w-0">
+          <div className="relative shrink-0">
             <Avatar user={user} size={88} textClassName="text-3xl" />
-            <div className="min-w-0">
-              <p className="text-xl font-semibold text-app-text truncate" title={displayIdentity(user)}>
-                {displayIdentity(user)}
-              </p>
-              {user?.user_metadata?.username ? (
-                <p className="text-sm text-app-text-secondary truncate">{user.email}</p>
-              ) : null}
-              {memberSince && (
-                <p className="text-xs text-app-text-muted mt-1">{t("profile_member_since", { date: memberSince })}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:w-44 shrink-0">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void handleUploadAvatar(file);
-              }}
-            />
-            <Button
-              variant="secondary"
-              disabled={avatarBusy}
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full"
+            <button
+              type="button"
+              onClick={openAvatarModal}
+              aria-label={t("avatar_section_title")}
+              title={t("avatar_section_title")}
+              className="absolute -bottom-0.5 -right-0.5 w-8 h-8 rounded-full bg-app-surface border border-app-border-strong text-app-text-secondary flex items-center justify-center shadow-lg hover:text-app-text hover:border-app-accent transition-colors"
             >
-              <Upload size={14} />
-              {avatarBusy ? t("avatar_uploading") : t("avatar_upload")}
-            </Button>
-            {currentAvatar.url && (
-              <Button variant="ghost" disabled={avatarBusy} onClick={() => void handleRemoveAvatar()} className="w-full">
-                {t("avatar_remove")}
-              </Button>
+              <Camera size={15} />
+            </button>
+          </div>
+          <div className="min-w-0">
+            <p className="text-xl font-semibold text-app-text truncate" title={displayIdentity(user)}>
+              {displayIdentity(user)}
+            </p>
+            {user?.user_metadata?.username ? (
+              <p className="text-sm text-app-text-secondary truncate">{user.email}</p>
+            ) : null}
+            {memberSince && (
+              <p className="text-xs text-app-text-muted mt-1">{t("profile_member_since", { date: memberSince })}</p>
             )}
-            <p className="text-[11px] leading-snug text-app-text-muted">{t("avatar_hint")}</p>
           </div>
         </div>
-
-        {avatarError && (
-          <div className="mt-4">
-            <ErrorBanner message={avatarError} />
-          </div>
-        )}
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 items-start">
@@ -308,42 +313,6 @@ export default function ProfilePage() {
                 autoComplete="username"
               />
             </Field>
-
-            <div className="pt-4 mt-1 border-t border-app-border">
-              <p className="text-xs text-app-text-muted mb-4">{t("avatar_no_photo_hint")}</p>
-              <Field label={t("avatar_color")}>
-                <div className="flex flex-wrap gap-2">
-                  {AVATAR_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      aria-label={color}
-                      onClick={() => {
-                        setAvatarColor(color);
-                        setProfileSuccess(false);
-                      }}
-                      style={{ backgroundColor: color }}
-                      className={`w-7 h-7 rounded-full transition-transform hover:scale-110 ${
-                        avatarColor === color ? "ring-2 ring-offset-2 ring-offset-app-bg ring-app-text" : ""
-                      }`}
-                    />
-                  ))}
-                </div>
-              </Field>
-              <Field label={t("avatar_initials")}>
-                <input
-                  className={inputCls}
-                  type="text"
-                  maxLength={2}
-                  value={avatarInitials}
-                  onChange={(e) => {
-                    setAvatarInitials(e.target.value);
-                    setProfileSuccess(false);
-                  }}
-                  placeholder={t("avatar_initials_placeholder")}
-                />
-              </Field>
-            </div>
 
             <Button type="submit" className="w-full mt-4" disabled={profileSaving}>
               {profileSaving ? "…" : t("save_changes")}
@@ -398,6 +367,85 @@ export default function ProfilePage() {
           </Card>
         </div>
       </div>
+
+      {avatarModalOpen && (
+        <Modal title={t("avatar_section_title")} onClose={() => setAvatarModalOpen(false)}>
+          {avatarError && (
+            <div className="mb-4">
+              <ErrorBanner message={avatarError} />
+            </div>
+          )}
+
+          <div className="flex flex-col items-center gap-4 mb-6">
+            <Avatar user={user} size={96} textClassName="text-3xl" />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleUploadAvatar(file);
+              }}
+            />
+            <div className="w-full flex flex-col gap-2">
+              <Button
+                variant="secondary"
+                disabled={avatarBusy}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full"
+              >
+                <Upload size={14} />
+                {avatarBusy ? t("avatar_uploading") : t("avatar_upload")}
+              </Button>
+              {currentAvatar.url && (
+                <Button
+                  variant="ghost"
+                  disabled={avatarBusy}
+                  onClick={() => void handleRemoveAvatar()}
+                  className="w-full"
+                >
+                  {t("avatar_remove")}
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-app-text-muted text-center">{t("avatar_hint")}</p>
+          </div>
+
+          <div className="pt-5 border-t border-app-border">
+            <p className="text-xs text-app-text-muted mb-4">{t("avatar_no_photo_hint")}</p>
+            <Field label={t("avatar_color")}>
+              <div className="flex flex-wrap gap-2">
+                {AVATAR_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={color}
+                    onClick={() => setAvatarColor(color)}
+                    style={{ backgroundColor: color }}
+                    className={`w-7 h-7 rounded-full transition-transform hover:scale-110 ${
+                      avatarColor === color ? "ring-2 ring-offset-2 ring-offset-app-surface ring-app-text" : ""
+                    }`}
+                  />
+                ))}
+              </div>
+            </Field>
+            <Field label={t("avatar_initials")}>
+              <input
+                className={inputCls}
+                type="text"
+                maxLength={2}
+                value={avatarInitials}
+                onChange={(e) => setAvatarInitials(e.target.value)}
+                placeholder={t("avatar_initials_placeholder")}
+              />
+            </Field>
+            <Button className="w-full mt-1" disabled={avatarBusy} onClick={() => void handleSaveAvatarStyle()}>
+              {avatarBusy ? "…" : t("save_changes")}
+            </Button>
+          </div>
+        </Modal>
+      )}
 
       {deleteModalOpen && (
         <Modal title={t("delete_account_confirm_title")} onClose={closeDeleteModal}>
