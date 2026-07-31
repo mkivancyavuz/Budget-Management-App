@@ -4,10 +4,11 @@
 // summing postings — never stored as independent mutable fields. This keeps
 // the numbers auditable and prevents drift bugs.
 
-export type Account = string; // "unallocated" | "buffer" | categoryId
+export type Account = string; // "unallocated" | "buffer" | "credit_card" | categoryId
 
 export const UNALLOCATED: Account = "unallocated";
 export const BUFFER: Account = "buffer";
+export const CREDIT_CARD: Account = "credit_card";
 
 export type TransactionType =
   | "initial_balance" // starting cash on hand when the user set up the app
@@ -16,6 +17,7 @@ export type TransactionType =
   | "deallocate" // category -> unallocated
   | "transfer" // category -> category (includes buffer contribute/draw)
   | "spend" // money leaves a category (paid out in real life)
+  | "pay_credit_card" // real cash leaves unallocated to pay down the debt balance
   | "adjustment"; // manual correction (e.g. reconciling bank balance)
 
 export interface Posting {

@@ -88,6 +88,36 @@ body {
   color: var(--text);
 }
 
+/* Hide the native up/down stepper arrows on every <input type="number">.
+   They're visually noisy against the app's custom inputs and the amounts
+   here are typed, not nudged. The input still accepts numeric input and
+   keyboard arrow keys — only the rendered buttons are removed. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+/* Browsers force an opaque (often yellow/white) background on autofilled
+   inputs, which breaks the app's dark glass inputs. Force it back to the
+   theme surface color so autofilled fields (e.g. email/password on login)
+   look the same as untouched ones. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: inset 0 0 0px 1000px var(--surface);
+}
+
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

@@ -7,6 +7,7 @@ import { ThemeProvider, themeInitScript } from "@/lib/theme";
 import { AuthProvider } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
+import { Footer } from "@/components/Footer";
 import { SupabaseSetupNotice } from "@/components/SupabaseSetupNotice";
 
 export const metadata: Metadata = {
@@ -14,8 +15,14 @@ export const metadata: Metadata = {
   description: "Budget based on cash actually in hand, built for irregular freelance income.",
 };
 
+// The service-role key is required now too: the sign-in guard and every data
+// API route validate sessions against our own `sessions` table using the
+// admin client (see lib/serverSession.ts) rather than a client-held Supabase
+// JWT, so without it the app has no way to authenticate anyone.
 const supabaseConfigured = Boolean(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 export default function RootLayout({
@@ -52,6 +59,7 @@ export default function RootLayout({
                     <main className="flex-1 min-w-0 flex flex-col">
                       <MobileNav />
                       <div className="flex-1 w-full max-w-[1800px] mx-auto px-1 sm:px-2 py-2">{children}</div>
+                      <Footer />
                     </main>
                   </div>
                 </StoreProvider>

@@ -3,28 +3,46 @@
 import React, { useState } from "react";
 import { useStore } from "@/lib/store";
 import { useLanguage } from "@/lib/i18n";
-import { unallocatedCash, computeIncomeInsights, monthlyProfitTotals, formatCurrency, renderTransactionLabel } from "@/lib/ledger";
+import {
+  unallocatedCash,
+  computeIncomeInsights,
+  monthlyProfitTotals,
+  creditCardDebt,
+  transactionOutflow,
+  categoryExpenseTotals,
+  categoryDisplayName,
+  formatCurrency,
+  renderTransactionLabel,
+} from "@/lib/ledger";
 import { Card, Button, Badge } from "@/components/ui";
 import { Modal } from "@/components/Modal";
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { IncomeTrendChart } from "@/components/IncomeTrendChart";
 import { ProfitTrendChart } from "@/components/ProfitTrendChart";
+import { CategoryPieChart } from "@/components/CategoryPieChart";
 import { CategoryManager } from "@/components/CategoryManager";
 import { AnimatedCurrency } from "@/components/AnimatedNumber";
-import { IncomeForm, AllocateForm, SpendForm, InitialBalanceForm } from "@/components/ActionForms";
+import {
+  IncomeForm,
+  AllocateForm,
+  InitialBalanceForm,
+  PayCreditCardForm,
+} from "@/components/ActionForms";
 
 type ModalKind =
   | "income"
   | "allocate"
-  | "spend"
   | "manageCategories"
   | "initialBalance"
+  | "payCreditCard"
   | null;
 
 export default function DashboardPage() {
   const { state, loading, loadDemoData, clearAll } = useStore();
   const { t } = useLanguage();
   const [modal, setModal] = useState<ModalKind>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   if (loading) {
     return <p className="text-sm text-app-text-secondary">{t("loading")}</p>;
@@ -33,6 +51,11 @@ export default function DashboardPage() {
   const free = unallocatedCash(state.transactions);
   const insights = computeIncomeInsights(state.transactions);
   const profitMonths = monthlyProfitTotals(state.transactions);
+  const debt = creditCardDebt(state.transactions);
+  const expenseTotals = categoryExpenseTotals(state.transactions);
+  const pieData = state.categories
+    .filter((c) => !c.archived)
+    .map((c) => ({ categoryId: c.id, name: categoryDisplayName(c, t), amount: expenseTotals[c.id] ?? 0 }));
 
   const recentIncome = state.transactions
     .filter((tx) => tx.type === "income")
@@ -115,7 +138,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-app-text-muted">{tx.date}</p>
                 </div>
                 <span className="font-semibold text-app-danger">
-                  {formatCurrency(tx.postings[0]?.amount ?? 0)}
+                  -{formatCurrency(transactionOutflow(tx))}
                 </span>
               </div>
             ))}
@@ -124,18 +147,30 @@ export default function DashboardPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={() => setModal("spend")}>
-          {t("log_a_spend")}
-        </Button>
         <Button variant="secondary" onClick={() => setModal("manageCategories")}>
           {t("manage_categories")}
         </Button>
         {hasAnyData && (
-          <Button variant="ghost" onClick={clearAll}>
+          <Button variant="danger" onClick={() => setConfirmClear(true)}>
             {t("clear_all_data")}
           </Button>
         )}
       </div>
+
+      <Card>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-medium text-app-text-secondary">{t("credit_card_debt_title")}</h3>
+            <p className={`text-2xl font-bold tracking-tight mt-1 ${debt > 0 ? "text-app-danger" : "text-app-text"}`}>
+              {debt > 0 ? <AnimatedCurrency value={debt} /> : t("no_debt")}
+            </p>
+            <p className="text-xs text-app-text-muted mt-1">{t("credit_card_debt_hint")}</p>
+          </div>
+          <Button variant="secondary" onClick={() => setModal("payCreditCard")} disabled={debt <= 0}>
+            {t("pay_credit_card")}
+          </Button>
+        </div>
+      </Card>
 
       <CategoryGrid />
 
@@ -154,6 +189,11 @@ export default function DashboardPage() {
         <ProfitTrendChart months={profitMonths} />
       </Card>
 
+      <Card>
+        <h3 className="text-sm font-medium text-app-text-secondary mb-4">{t("category_pie_title")}</h3>
+        <CategoryPieChart data={pieData} />
+      </Card>
+
       {modal === "income" && (
         <Modal title={t("modal_income")} onClose={() => setModal(null)}>
           <IncomeForm onDone={() => setModal(null)} />
@@ -164,11 +204,6 @@ export default function DashboardPage() {
           <AllocateForm onDone={() => setModal(null)} />
         </Modal>
       )}
-      {modal === "spend" && (
-        <Modal title={t("modal_spend")} onClose={() => setModal(null)}>
-          <SpendForm onDone={() => setModal(null)} />
-        </Modal>
-      )}
       {modal === "manageCategories" && (
         <Modal title={t("modal_manage_categories")} onClose={() => setModal(null)}>
           <CategoryManager />
@@ -177,6 +212,34 @@ export default function DashboardPage() {
       {modal === "initialBalance" && (
         <Modal title={t("modal_initial_balance")} onClose={() => setModal(null)}>
           <InitialBalanceForm onDone={() => setModal(null)} />
+        </Modal>
+      )}
+      {modal === "payCreditCard" && (
+        <Modal title={t("modal_pay_credit_card")} onClose={() => setModal(null)}>
+          <PayCreditCardForm onDone={() => setModal(null)} />
+        </Modal>
+      )}
+
+      {confirmClear && (
+        <Modal title={t("clear_all_confirm_title")} onClose={() => setConfirmClear(false)}>
+          <p className="text-sm text-app-text-secondary mb-5">{t("clear_all_confirm_body")}</p>
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="danger"
+              disabled={clearing}
+              onClick={async () => {
+                setClearing(true);
+                await clearAll();
+                setClearing(false);
+                setConfirmClear(false);
+              }}
+            >
+              {clearing ? "…" : t("confirm_clear")}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmClear(false)} disabled={clearing}>
+              {t("cancel")}
+            </Button>
+          </div>
         </Modal>
       )}
     </div>
