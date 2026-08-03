@@ -49,7 +49,16 @@ export async function POST(request: Request) {
       const category = body.payload?.category as Category;
       const row = { ...categoryToRow(category), user_id: userId };
       const { error } = await admin.from("categories").insert(row);
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      if (error) {
+        // 23505 = unique_violation, i.e. the categories_user_name_unique index
+        // rejected a duplicate name. Report it as a recognisable code so the
+        // client can show its own translated message instead of raw Postgres
+        // text.
+        if (error.code === "23505") {
+          return NextResponse.json({ error: "duplicate_category" }, { status: 409 });
+        }
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -60,6 +69,15 @@ export async function POST(request: Request) {
       if ("monthlyTarget" in patch) dbPatch.monthly_target = patch.monthlyTarget;
       if ("nameKey" in patch) dbPatch.name_key = patch.nameKey ?? null;
       const { error } = await admin.from("categories").update(dbPatch).eq("id", id).eq("user_id", userId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ ok: true });
+    }
+
+    case "deleteCategory": {
+      // Only used for categories with no ledger history (the client checks
+      // first); scoped by user_id so one tenant can't delete another's row.
+      const { id } = (body.payload ?? {}) as { id: string };
+      const { error } = await admin.from("categories").delete().eq("id", id).eq("user_id", userId);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
       return NextResponse.json({ ok: true });
     }

@@ -46,6 +46,19 @@ create table if not exists public.buffer_settings (
 create index if not exists categories_user_id_idx on public.categories (user_id);
 create index if not exists transactions_user_id_idx on public.transactions (user_id);
 
+-- One *live* category name per user, compared case- and whitespace-insensitively.
+-- The app already blocks duplicates before saving; this is the backstop so a
+-- second entry can never be created by any other path (a stale tab racing the
+-- same name, a direct API call, a future import feature).
+--
+-- Deliberately partial (`where archived = false`): a deleted category is
+-- archived rather than removed when it still owns transactions, and those
+-- husks must not keep their names reserved forever.
+drop index if exists categories_user_name_unique;
+create unique index if not exists categories_user_name_unique
+  on public.categories (user_id, lower(btrim(name)))
+  where archived = false;
+
 alter table public.categories enable row level security;
 alter table public.transactions enable row level security;
 alter table public.buffer_settings enable row level security;

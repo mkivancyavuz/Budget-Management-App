@@ -41,10 +41,18 @@ export function categoryBalances(
   return map;
 }
 
-/** Total cash actually sitting in the account right now (sanity check total). */
+/** Total cash actually sitting in the account right now.
+ *
+ * Only accounts that still hold real money count: unallocated cash plus the
+ * savings buffer. Ordinary category accounts are deliberately excluded —
+ * they accumulate what has already been *spent* in that category, so adding
+ * them back would cancel out the cash the expense removed and leave the
+ * total unchanged after every purchase. */
 export function totalCashOnHand(transactions: Transaction[], categories: Category[]): number {
   let total = unallocatedCash(transactions);
-  for (const c of categories) total += accountBalance(transactions, c.id);
+  for (const c of categories) {
+    if (c.isBuffer) total += accountBalance(transactions, c.id);
+  }
   return round2(total);
 }
 
@@ -95,12 +103,22 @@ function adjustmentEffect(tx: Transaction): { categoryId: string; amount: number
   return { categoryId, amount: posting.amount };
 }
 
+/** The current month as `yyyy-mm`, matching the prefix of a transaction date.
+ * Uses local time, not UTC, so "this month" means the user's month. */
+export function currentMonthKey(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 /** Total spend per category (spend/allocate transactions, plus manual
  * balance corrections), for the expense-distribution pie chart. Keyed by
- * category id. */
-export function categoryExpenseTotals(transactions: Transaction[]): Record<string, number> {
+ * category id. Pass `month` as `yyyy-mm` to count only that month. */
+export function categoryExpenseTotals(
+  transactions: Transaction[],
+  month?: string
+): Record<string, number> {
   const map: Record<string, number> = {};
   for (const tx of transactions) {
+    if (month && !tx.date.startsWith(month)) continue;
     if (tx.type === "spend" || tx.type === "allocate") {
       const categoryId = tx.meta?.categoryId;
       if (!categoryId) continue;
@@ -225,6 +243,14 @@ export function newId(prefix: string): string {
 }
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+/** Normalized form used to compare category names for duplicates. Trims and
+ * collapses inner whitespace, and lowercases with Turkish rules so "Kira" and
+ * "KİRA" are recognised as the same name (a plain toLowerCase() maps "İ" to
+ * "i̇" — an i with a combining dot — and would miss the match). */
+export function normalizeCategoryName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("tr");
+}
 
 /** Display name for a category — follows the current language for built-in/demo
  * categories (those with a `nameKey`), falls back to the stored free-text name

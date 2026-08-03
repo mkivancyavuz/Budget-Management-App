@@ -4,7 +4,13 @@ import React, { useState } from "react";
 import { Pencil } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useLanguage } from "@/lib/i18n";
-import { accountBalance, formatCurrency, categoryDisplayName } from "@/lib/ledger";
+import {
+  formatCurrency,
+  categoryDisplayName,
+  categoryExpenseTotals,
+  currentMonthKey,
+  normalizeCategoryName,
+} from "@/lib/ledger";
 import { Card, ProgressBar, Badge, Button, ErrorBanner } from "./ui";
 import { Modal } from "./Modal";
 import type { Category } from "@/lib/types";
@@ -23,9 +29,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function CategoryGrid() {
   const { state, updateCategory, adjustCategoryBalance } = useStore();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const categories = state.categories.filter((c) => !c.archived && !c.isBuffer);
   const [editing, setEditing] = useState<Category | null>(null);
+
+  // Every figure here covers the current calendar month only, so the card
+  // shows what has been spent per category *this* month rather than a
+  // running all-time total.
+  const thisMonth = currentMonthKey();
+  const monthTotals = categoryExpenseTotals(state.transactions, thisMonth);
+  const monthLabel = new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     // The edit modal is rendered as a sibling of <Card>, not nested inside
@@ -37,10 +53,13 @@ export function CategoryGrid() {
     // viewport like every other modal in the app.
     <>
       <Card>
-        <h3 className="text-sm font-medium text-app-text-secondary mb-4">{t("categories")}</h3>
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <h3 className="text-sm font-medium text-app-text-secondary">{t("categories")}</h3>
+          <Badge>{monthLabel}</Badge>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
           {categories.map((c) => {
-            const bal = accountBalance(state.transactions, c.id);
+            const bal = monthTotals[c.id] ?? 0;
             const target = c.monthlyTarget;
             const pct = target > 0 ? (bal / target) * 100 : bal > 0 ? 100 : 0;
             const overspent = bal < 0;
@@ -81,13 +100,22 @@ export function CategoryGrid() {
       {editing && (
         <EditCategoryModal
           category={editing}
-          currentAmount={accountBalance(state.transactions, editing.id)}
+          currentAmount={monthTotals[editing.id] ?? 0}
+          // Renaming can collide just like adding can, so the modal needs the
+          // other live categories' names to check against. Archived ones are
+          // excluded — a deleted category shouldn't reserve its name.
+          takenNames={state.categories
+            .filter((c) => c.id !== editing.id && !c.archived)
+            .map((c) => ({ id: c.id, label: categoryDisplayName(c, t), raw: c.name }))}
           onClose={() => setEditing(null)}
           onSave={async (name, newAmount) => {
             await updateCategory(editing.id, { name, nameKey: undefined });
+            // The figure being edited is this month's spend, so correct by the
+            // difference against the month total and date the correction today
+            // — that keeps it inside the same month it adjusts.
             await adjustCategoryBalance({
               categoryId: editing.id,
-              newAmount,
+              delta: newAmount - (monthTotals[editing.id] ?? 0),
               date: new Date().toISOString().slice(0, 10),
             });
             setEditing(null);
@@ -101,11 +129,13 @@ export function CategoryGrid() {
 function EditCategoryModal({
   category,
   currentAmount,
+  takenNames,
   onClose,
   onSave,
 }: {
   category: Category;
   currentAmount: number;
+  takenNames: { id: string; label: string; raw: string }[];
   onClose: () => void;
   onSave: (name: string, newAmount: number) => Promise<void>;
 }) {
@@ -120,6 +150,14 @@ function EditCategoryModal({
     setError(null);
     if (!name.trim()) {
       setError(t("err_category_name_required"));
+      return;
+    }
+    const wanted = normalizeCategoryName(name);
+    const clash = takenNames.find(
+      (other) => normalizeCategoryName(other.label) === wanted || normalizeCategoryName(other.raw) === wanted
+    );
+    if (clash) {
+      setError(t("err_category_exists", { name: clash.label }));
       return;
     }
     const parsed = parseFloat(amount);

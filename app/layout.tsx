@@ -11,7 +11,7 @@ import { Footer } from "@/components/Footer";
 import { SupabaseSetupNotice } from "@/components/SupabaseSetupNotice";
 
 export const metadata: Metadata = {
-  title: "Freelance Cash Flow",
+  title: "Budget Management",
   description: "Budget based on cash actually in hand, built for irregular freelance income.",
 };
 

@@ -51,7 +51,9 @@ export function IncomeForm({ onDone }: { onDone: () => void }) {
         <input className={inputCls} type="text" required value={source} onChange={(e) => setSource(e.target.value)} placeholder="örn. Acme A.Ş." />
       </Field>
       <Field label={t("date_received")}>
-        <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        {/* max=today: income is logged when it actually arrives, so a future
+            date would count money that hasn't been received yet. */}
+        <input className={inputCls} type="date" required max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
       </Field>
       <Field label={t("note_optional")}>
         <input className={inputCls} type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("invoice_placeholder")} />
@@ -120,7 +122,9 @@ export function AllocateForm({ onDone }: { onDone: () => void }) {
         <input className={`${inputCls} no-spinner`} type="number" inputMode="decimal" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
       </Field>
       <Field label={t("date")}>
-        <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        {/* Same rule as income: an expense is recorded once it has happened,
+            never dated ahead. */}
+        <input className={inputCls} type="date" required max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
       </Field>
       <Button type="submit" className="w-full">{t("allocate")}</Button>
     </form>

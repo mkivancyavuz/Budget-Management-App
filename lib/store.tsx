@@ -2,7 +2,15 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { AppState, Transaction, Category, UNALLOCATED, BUFFER, CREDIT_CARD } from "./types";
-import { newId, unallocatedCash, accountBalance, round2, formatCurrency } from "./ledger";
+import {
+  newId,
+  unallocatedCash,
+  accountBalance,
+  round2,
+  formatCurrency,
+  normalizeCategoryName,
+  categoryDisplayName,
+} from "./ledger";
 import { buildSeedState } from "./seed";
 import { useLanguage } from "./i18n";
 import { useAuth } from "./auth";
@@ -37,6 +45,15 @@ async function callApi(op: string, payload?: unknown): Promise<{ ok: true; data:
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
+/** Today as `yyyy-mm-dd` in the user's own timezone — the latest date income or
+ * an expense may be dated. Compared as strings, which is safe for this format. */
+function todayStr(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
+}
+
 interface StoreShape {
   state: AppState;
   loading: boolean;
@@ -58,7 +75,7 @@ interface StoreShape {
   setInitialBalance: (amount: number, date: string) => Promise<ActionResult>;
   addCategory: (input: { name: string; monthlyTarget: number }) => Promise<ActionResult>;
   updateCategory: (id: string, patch: Partial<Pick<Category, "name" | "monthlyTarget" | "nameKey">>) => Promise<void>;
-  adjustCategoryBalance: (input: { categoryId: string; newAmount: number; date: string }) => Promise<ActionResult>;
+  adjustCategoryBalance: (input: { categoryId: string; delta: number; date: string }) => Promise<ActionResult>;
   archiveCategory: (id: string) => Promise<void>;
   setBufferSettings: (patch: Partial<AppState["bufferSettings"]>) => Promise<void>;
   loadDemoData: () => Promise<void>;
@@ -155,6 +172,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     async (input: { amount: number; source: string; date: string; note?: string }): Promise<ActionResult> => {
       if (input.amount <= 0) return { ok: false, error: t("err_income_amount") };
       if (!input.source.trim()) return { ok: false, error: t("err_income_source") };
+      if (input.date > todayStr()) return { ok: false, error: t("err_future_date") };
       return addTransaction({
         id: newId("tx"),
         type: "income",
@@ -175,6 +193,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (input.amount <= 0) return { ok: false, error: t("err_amount_positive") };
       const cat = findCategory(input.categoryId);
       if (!cat) return { ok: false, error: t("err_category_not_found") };
+      if (input.date > todayStr()) return { ok: false, error: t("err_future_date") };
       const amt = round2(input.amount);
       const free = unallocatedCash(state.transactions);
       // If there isn't enough cash on hand, cover as much as possible from
@@ -363,6 +382,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!input.name.trim()) return { ok: false, error: t("err_category_name_required") };
       if (input.monthlyTarget < 0) return { ok: false, error: t("err_target_negative") };
       if (!user) return { ok: false, error: t("err_category_not_found") };
+      // Reject a name that's already taken by a *live* category. Deleted
+      // (archived) ones are skipped — they're gone as far as the user is
+      // concerned, so their names must be free to use again. They keep their
+      // own ids, so old transactions stay attributed to the right row.
+      const wanted = normalizeCategoryName(input.name);
+      const clash = state.categories.find(
+        (c) =>
+          !c.archived &&
+          (normalizeCategoryName(c.name) === wanted ||
+            normalizeCategoryName(categoryDisplayName(c, t)) === wanted)
+      );
+      if (clash) {
+        return { ok: false, error: t("err_category_exists", { name: categoryDisplayName(clash, t) }) };
+      }
       const category: Category = {
         id: newId("cat").replace("cat_", ""),
         name: input.name.trim(),
@@ -370,11 +403,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
       };
       const res = await callApi("insertCategory", { category });
-      if (!res.ok) return { ok: false, error: res.error };
+      if (!res.ok) {
+        // The database's unique index caught a duplicate the local check
+        // missed (e.g. another tab added the same name a moment ago).
+        if (res.error === "duplicate_category") {
+          return { ok: false, error: t("err_category_exists", { name: category.name }) };
+        }
+        return { ok: false, error: res.error };
+      }
       setState((s) => ({ ...s, categories: [...s.categories, category] }));
       return { ok: true };
     },
-    [user, t]
+    [user, t, state.categories]
   );
 
   const updateCategory = useCallback(
@@ -393,6 +433,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const archiveCategory = useCallback(
     async (id: string) => {
       if (!user) return;
+
+      // If nothing in the ledger touches this category, delete the row for
+      // real — keeping an archived husk around made the app treat the name as
+      // still taken. Categories that *do* have history are archived instead,
+      // because their transactions still reference them and deleting the row
+      // would leave those entries pointing at nothing.
+      const hasHistory = state.transactions.some(
+        (tx) => tx.meta?.categoryId === id || tx.postings.some((p) => p.account === id)
+      );
+
+      if (!hasHistory) {
+        const res = await callApi("deleteCategory", { id });
+        if (!res.ok) return;
+        setState((s) => ({ ...s, categories: s.categories.filter((c) => c.id !== id) }));
+        return;
+      }
+
       const res = await callApi("archiveCategory", { id });
       if (!res.ok) return;
       setState((s) => ({
@@ -400,7 +457,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         categories: s.categories.map((c) => (c.id === id ? { ...c, archived: true } : c)),
       }));
     },
-    [user]
+    [user, state.transactions]
   );
 
   // Manual correction for a category's current balance ("Ödenen Tutar" in the
@@ -412,13 +469,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // there isn't enough, same as allocate()); decreasing it always just
   // returns the difference to unallocated cash.
   const adjustCategoryBalance = useCallback(
-    async (input: { categoryId: string; newAmount: number; date: string }): Promise<ActionResult> => {
+    async (input: { categoryId: string; delta: number; date: string }): Promise<ActionResult> => {
       const cat = findCategory(input.categoryId);
       if (!cat) return { ok: false, error: t("err_category_not_found") };
-      if (input.newAmount < 0) return { ok: false, error: t("err_target_negative") };
-      const currentBal = accountBalance(state.transactions, input.categoryId);
-      const target = round2(input.newAmount);
-      const delta = round2(target - currentBal);
+      // Takes a signed delta rather than a target figure: the caller decides
+      // what the number on screen means (all-time spend, this month's spend,
+      // …) and just says how much to move it by.
+      const delta = round2(input.delta);
       if (delta === 0) return { ok: true };
 
       let postings;

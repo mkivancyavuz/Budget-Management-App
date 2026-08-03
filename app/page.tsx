@@ -10,6 +10,7 @@ import {
   creditCardDebt,
   transactionOutflow,
   categoryExpenseTotals,
+  currentMonthKey,
   categoryDisplayName,
   formatCurrency,
   renderTransactionLabel,
@@ -39,7 +40,7 @@ type ModalKind =
 
 export default function DashboardPage() {
   const { state, loading, loadDemoData, clearAll } = useStore();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [modal, setModal] = useState<ModalKind>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -52,20 +53,29 @@ export default function DashboardPage() {
   const insights = computeIncomeInsights(state.transactions);
   const profitMonths = monthlyProfitTotals(state.transactions);
   const debt = creditCardDebt(state.transactions);
-  const expenseTotals = categoryExpenseTotals(state.transactions);
+  // The pie chart covers this calendar month only, so it answers "where is my
+  // money going right now" rather than blending in older months.
+  const thisMonth = currentMonthKey();
+  const expenseTotals = categoryExpenseTotals(state.transactions, thisMonth);
   const pieData = state.categories
     .filter((c) => !c.archived)
     .map((c) => ({ categoryId: c.id, name: categoryDisplayName(c, t), amount: expenseTotals[c.id] ?? 0 }));
+  const currentMonthLabel = new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", {
+    month: "long",
+    year: "numeric",
+  });
 
+  // These two lists are scoped to the current month as well, so the whole
+  // top of the dashboard describes the same period.
+  // Not truncated — the whole month is listed and the card scrolls, so nothing
+  // is silently hidden once there are more than a handful of entries.
   const recentIncome = state.transactions
-    .filter((tx) => tx.type === "income")
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 5);
+    .filter((tx) => tx.type === "income" && tx.date.startsWith(thisMonth))
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   const recentExpenses = state.transactions
-    .filter((tx) => tx.type === "spend" || tx.type === "allocate")
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 5);
+    .filter((tx) => (tx.type === "spend" || tx.type === "allocate") && tx.date.startsWith(thisMonth))
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   const hasAnyIncomeHistory = state.transactions.some((tx) => tx.type === "income" || tx.type === "initial_balance");
   const hasAnyData = state.transactions.length > 0;
@@ -110,8 +120,13 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <h3 className="text-sm font-medium text-app-text-secondary mb-3">{t("recent_income")}</h3>
-          <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-medium text-app-text-secondary">{t("recent_income")}</h3>
+            <Badge>{currentMonthLabel}</Badge>
+          </div>
+          {/* Caps at roughly five rows, then scrolls — pr-1 keeps the amounts
+              from sitting under the scrollbar. */}
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
             {recentIncome.length === 0 && <p className="text-sm text-app-text-muted">{t("no_payments_yet")}</p>}
             {recentIncome.map((tx) => (
               <div key={tx.id} className="flex items-center justify-between text-sm">
@@ -128,8 +143,11 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <h3 className="text-sm font-medium text-app-text-secondary mb-3">{t("recent_expenses")}</h3>
-          <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-medium text-app-text-secondary">{t("recent_expenses")}</h3>
+            <Badge>{currentMonthLabel}</Badge>
+          </div>
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
             {recentExpenses.length === 0 && <p className="text-sm text-app-text-muted">{t("no_expenses_yet")}</p>}
             {recentExpenses.map((tx) => (
               <div key={tx.id} className="flex items-center justify-between text-sm">
@@ -175,11 +193,11 @@ export default function DashboardPage() {
       <CategoryGrid />
 
       <Card>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-app-text-secondary">{t("income_trend_title")}</h3>
-          {insights.average > 0 && <Badge>{t("avg_per_month", { amount: formatCurrency(insights.average) })}</Badge>}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium text-app-text-secondary">{t("category_pie_title")}</h3>
+          <Badge>{currentMonthLabel}</Badge>
         </div>
-        <IncomeTrendChart months={insights.months} />
+        <CategoryPieChart data={pieData} />
       </Card>
 
       <Card>
@@ -190,8 +208,11 @@ export default function DashboardPage() {
       </Card>
 
       <Card>
-        <h3 className="text-sm font-medium text-app-text-secondary mb-4">{t("category_pie_title")}</h3>
-        <CategoryPieChart data={pieData} />
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-app-text-secondary">{t("income_trend_title")}</h3>
+          {insights.average > 0 && <Badge>{t("avg_per_month", { amount: formatCurrency(insights.average) })}</Badge>}
+        </div>
+        <IncomeTrendChart months={insights.months} />
       </Card>
 
       {modal === "income" && (

@@ -290,10 +290,14 @@ export default function ProfilePage() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 items-start">
-        <Card>
+      {/* No `items-start` here on purpose: the grid stretches every column to
+          the tallest one (the sign-out + delete stack), and each card below
+          fills that height with its submit button pinned to the bottom, so all
+          three columns line up. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+        <Card className="h-full flex flex-col">
           <h2 className="text-sm font-semibold text-app-text mb-4">{t("profile_edit_title")}</h2>
-          <form onSubmit={handleSaveProfile}>
+          <form onSubmit={handleSaveProfile} className="flex flex-col flex-1">
             {profileError && (
               <div className="mb-4">
                 <ErrorBanner message={profileError} />
@@ -314,15 +318,15 @@ export default function ProfilePage() {
               />
             </Field>
 
-            <Button type="submit" className="w-full mt-4" disabled={profileSaving}>
+            <Button type="submit" className="w-full mt-auto" disabled={profileSaving}>
               {profileSaving ? "…" : t("save_changes")}
             </Button>
           </form>
         </Card>
 
-        <Card>
+        <Card className="h-full flex flex-col">
           <h2 className="text-sm font-semibold text-app-text mb-4">{t("password_section_title")}</h2>
-          <form onSubmit={handleChangePassword}>
+          <form onSubmit={handleChangePassword} className="flex flex-col flex-1">
             {passwordError && (
               <div className="mb-4">
                 <ErrorBanner message={passwordError} />
@@ -341,7 +345,7 @@ export default function ProfilePage() {
               onChange={setConfirmPassword}
               autoComplete="new-password"
             />
-            <Button type="submit" className="w-full mt-4" disabled={passwordSaving}>
+            <Button type="submit" className="w-full mt-auto" disabled={passwordSaving}>
               {passwordSaving ? "…" : t("save_changes")}
             </Button>
           </form>
