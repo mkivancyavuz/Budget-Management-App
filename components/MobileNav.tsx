@@ -8,6 +8,7 @@ import { useLanguage } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import { Avatar } from "./Avatar";
+import { isStandaloneRoute } from "@/lib/routes";
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -15,7 +16,7 @@ export function MobileNav() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
 
-  if (pathname?.startsWith("/login")) return null;
+  if (isStandaloneRoute(pathname)) return null;
 
   const links = [
     { href: "/", label: t("nav_dashboard"), icon: LayoutGrid },
