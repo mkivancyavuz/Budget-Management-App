@@ -84,16 +84,16 @@ export default function ResetPasswordPage() {
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-app-bg">
       <AuthBackground />
-      <div className="absolute top-4 right-4 z-10 flex items-center rounded-xl border border-app-border bg-app-surface/80 backdrop-blur overflow-hidden text-xs font-semibold">
+      <div className="absolute top-0 right-0 z-10 flex items-center rounded-bl-xl 2xl:rounded-bl-2xl border-b border-l border-app-border bg-app-surface/80 backdrop-blur overflow-hidden text-xs xl:text-sm 2xl:text-base font-semibold">
         <button
           onClick={() => setLang("tr")}
-          className={`px-3 py-2 transition-colors ${lang === "tr" ? "bg-app-accent text-white" : "text-app-text-secondary"}`}
+          className={`px-3 py-2 xl:px-4 xl:py-2.5 2xl:px-6 2xl:py-3 transition-colors ${lang === "tr" ? "bg-app-accent text-white" : "text-app-text-secondary"}`}
         >
           TR
         </button>
         <button
           onClick={() => setLang("en")}
-          className={`px-3 py-2 transition-colors ${lang === "en" ? "bg-app-accent text-white" : "text-app-text-secondary"}`}
+          className={`px-3 py-2 xl:px-4 xl:py-2.5 2xl:px-6 2xl:py-3 transition-colors ${lang === "en" ? "bg-app-accent text-white" : "text-app-text-secondary"}`}
         >
           EN
         </button>

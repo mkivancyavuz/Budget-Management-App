@@ -40,7 +40,6 @@ export function IncomeTrendChart({ months }: { months: MonthlyIncome[] }) {
           );
         })}
       </div>
-      <p className="text-xs text-app-text-secondary mt-3">{t("income_trend_note")}</p>
     </div>
   );
 }

@@ -5,9 +5,7 @@ import { StoreProvider } from "@/lib/store";
 import { LanguageProvider } from "@/lib/i18n";
 import { ThemeProvider, themeInitScript } from "@/lib/theme";
 import { AuthProvider } from "@/lib/auth";
-import { Sidebar } from "@/components/Sidebar";
-import { MobileNav } from "@/components/MobileNav";
-import { Footer } from "@/components/Footer";
+import { AppShell } from "@/components/AppShell";
 import { SiteBackground } from "@/components/SiteBackground";
 import { SupabaseSetupNotice } from "@/components/SupabaseSetupNotice";
 
@@ -60,17 +58,7 @@ export default function RootLayout({
               <AuthProvider>
                 <StoreProvider>
                   <SiteBackground />
-                  {/* relative z-10: the glow layer above is positioned at z-0,
-                      and positioned elements paint over non-positioned in-flow
-                      blocks — without this the backdrop would cover the app. */}
-                  <div className="relative z-10 flex min-h-screen w-full gap-3 p-3">
-                    <Sidebar />
-                    <main className="flex-1 min-w-0 flex flex-col">
-                      <MobileNav />
-                      <div className="flex-1 w-full max-w-[1800px] mx-auto px-1 sm:px-2 py-2">{children}</div>
-                      <Footer />
-                    </main>
-                  </div>
+                  <AppShell>{children}</AppShell>
                 </StoreProvider>
               </AuthProvider>
             </LanguageProvider>

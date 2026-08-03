@@ -63,8 +63,6 @@ const en: Dict = {
 
   // Income trend chart
   no_income_trend: "No income logged yet — trend will appear here.",
-  income_trend_note:
-    "Income varies month to month — this is exactly why savings matter: they smooth spending across the dry spells between payments.",
 
   // Profit trend chart
   profit_trend_title: "Profit (last 6 months)",
@@ -345,8 +343,6 @@ const tr: Dict = {
   cat_software: "Yazılım & Abonelikler",
 
   no_income_trend: "Henüz gelir kaydedilmedi — trend burada görünecek.",
-  income_trend_note:
-    "Gelir aydan aya değişkenlik gösterir — birikimin önemli olmasının sebebi tam olarak budur: ödemeler arasındaki durgun dönemlerde harcamayı dengeler.",
 
   profit_trend_title: "Kâr (son 6 ay)",
   no_profit_trend: "Henüz gelir veya gider kaydedilmedi — kâr burada görünecek.",
