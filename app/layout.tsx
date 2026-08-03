@@ -24,7 +24,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" className="h-full antialiased">
+    // suppressHydrationWarning: the theme-init script below deliberately sets
+    // data-theme on <html> before React hydrates, so the server HTML and the
+    // client tree differ on that one attribute by design. Without this, React
+    // logs a hydration mismatch for it on every load.
+    <html lang="tr" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
