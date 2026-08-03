@@ -66,7 +66,9 @@ export function AllocateForm({ onDone }: { onDone: () => void }) {
   const { t } = useLanguage();
   const free = unallocatedCash(state.transactions);
   const categories = state.categories.filter((c) => !c.archived);
-  const [categoryName, setCategoryName] = useState(categories[0] ? categoryDisplayName(categories[0], t) : "");
+  // Starts empty on purpose — pre-filling the first category made it easy to
+  // log an expense against the wrong one without noticing.
+  const [categoryName, setCategoryName] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayStr());
   const [error, setError] = useState<string | null>(null);
