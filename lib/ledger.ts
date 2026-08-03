@@ -94,13 +94,30 @@ export function transactionOutflow(tx: Transaction): number {
  * decreasing it counts as less — unlike spend/allocate, this can go either
  * way, so we read the actual signed posting on that category rather than
  * transactionOutflow() (which only ever sums negative postings). */
-function adjustmentEffect(tx: Transaction): { categoryId: string; amount: number } | null {
+export function adjustmentEffect(tx: Transaction): { categoryId: string; amount: number } | null {
   if (tx.type !== "adjustment") return null;
   const categoryId = tx.meta?.categoryId;
   if (!categoryId) return null;
   const posting = tx.postings.find((p) => p.account === categoryId);
   if (!posting) return null;
   return { categoryId, amount: posting.amount };
+}
+
+/** True for anything that changes what a category has spent — the expenses
+ * themselves plus manual corrections to them. Used by the dashboard's expense
+ * list so a corrected amount shows up there, not just in the totals. */
+export function affectsCategorySpend(tx: Transaction): boolean {
+  if (tx.type === "spend" || tx.type === "allocate") return true;
+  return adjustmentEffect(tx) !== null;
+}
+
+/** Signed amount an expense-ish transaction moves, from the wallet's point of
+ * view: negative when money went out, positive when a correction gave some
+ * back. */
+export function expenseSignedAmount(tx: Transaction): number {
+  const adj = adjustmentEffect(tx);
+  if (adj) return round2(-adj.amount);
+  return round2(-transactionOutflow(tx));
 }
 
 /** The current month as `yyyy-mm`, matching the prefix of a transaction date.

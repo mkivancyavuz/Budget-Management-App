@@ -8,9 +8,10 @@ import {
   computeIncomeInsights,
   monthlyProfitTotals,
   creditCardDebt,
-  transactionOutflow,
   categoryExpenseTotals,
   currentMonthKey,
+  affectsCategorySpend,
+  expenseSignedAmount,
   categoryDisplayName,
   formatCurrency,
   renderTransactionLabel,
@@ -73,9 +74,11 @@ export default function DashboardPage() {
     .filter((tx) => tx.type === "income" && tx.date.startsWith(thisMonth))
     .sort((a, b) => b.date.localeCompare(a.date));
 
+  // Corrections made from "Gider Dağılımı" are included, so editing an amount
+  // there is reflected in this list too rather than only in the totals.
   const recentExpenses = state.transactions
-    .filter((tx) => (tx.type === "spend" || tx.type === "allocate") && tx.date.startsWith(thisMonth))
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .filter((tx) => affectsCategorySpend(tx) && tx.date.startsWith(thisMonth))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 
   const hasAnyIncomeHistory = state.transactions.some((tx) => tx.type === "income" || tx.type === "initial_balance");
   const hasAnyData = state.transactions.length > 0;
@@ -149,17 +152,25 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
             {recentExpenses.length === 0 && <p className="text-sm text-app-text-muted">{t("no_expenses_yet")}</p>}
-            {recentExpenses.map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between text-sm">
-                <div>
-                  <p className="font-medium text-app-text">{renderTransactionLabel(tx, state.categories, t)}</p>
-                  <p className="text-xs text-app-text-muted">{tx.date}</p>
+            {recentExpenses.map((tx) => {
+              // A correction can go either way: raising the spent amount takes
+              // more money out (red), lowering it gives some back (green).
+              const signed = expenseSignedAmount(tx);
+              return (
+                <div key={tx.id} className="flex items-center justify-between gap-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium text-app-text">{renderTransactionLabel(tx, state.categories, t)}</p>
+                    <p className="text-xs text-app-text-muted">{tx.date}</p>
+                  </div>
+                  <span
+                    className={`font-semibold shrink-0 ${signed < 0 ? "text-app-danger" : "text-app-success"}`}
+                  >
+                    {signed < 0 ? "-" : "+"}
+                    {formatCurrency(Math.abs(signed))}
+                  </span>
                 </div>
-                <span className="font-semibold text-app-danger">
-                  -{formatCurrency(transactionOutflow(tx))}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
       </div>

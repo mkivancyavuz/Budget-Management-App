@@ -7,7 +7,7 @@ import { useLanguage } from "@/lib/i18n";
 import { Button, ErrorBanner } from "@/components/ui";
 import { PasswordField } from "@/components/PasswordField";
 
-type Mode = "signin" | "signup";
+type Mode = "signin" | "signup" | "forgot";
 
 export default function LoginPage() {
   const { t, lang, setLang } = useLanguage();
@@ -36,6 +36,27 @@ export default function LoginPage() {
 
     if (mode === "signup" && password !== confirmPassword) {
       setError(t("err_password_mismatch"));
+      return;
+    }
+
+    // Reset request: only the address is needed, and the reply is the same
+    // whether or not that address has an account.
+    if (mode === "forgot") {
+      setBusy(true);
+      try {
+        const res = await fetch("/api/auth/forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || body.error) setError(body.error ?? "Something went wrong.");
+        else setNotice(t("forgot_password_sent"));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Something went wrong.");
+      } finally {
+        setBusy(false);
+      }
       return;
     }
 
@@ -90,9 +111,15 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-lg font-semibold text-app-text mb-1">
-          {mode === "signin" ? t("auth_sign_in") : t("auth_sign_up")}
+          {mode === "signin"
+            ? t("auth_sign_in")
+            : mode === "signup"
+              ? t("auth_sign_up")
+              : t("forgot_password_title")}
         </h1>
-        <p className="text-sm text-app-text-secondary mb-5">{t("auth_subtitle")}</p>
+        <p className="text-sm text-app-text-secondary mb-5">
+          {mode === "forgot" ? t("forgot_password_subtitle") : t("auth_subtitle")}
+        </p>
 
         {error && (
           <div className="mb-4">
@@ -128,15 +155,17 @@ export default function LoginPage() {
               />
             </label>
           )}
-          <PasswordField
-            label={mode === "signup" ? t("auth_create_password") : t("auth_password")}
-            value={password}
-            onChange={setPassword}
-            required
-            minLength={6}
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            className={mode === "signup" ? "block mb-4" : "block mb-5"}
-          />
+          {mode !== "forgot" && (
+            <PasswordField
+              label={mode === "signup" ? t("auth_create_password") : t("auth_password")}
+              value={password}
+              onChange={setPassword}
+              required
+              minLength={6}
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              className={mode === "signup" ? "block mb-4" : "block mb-5"}
+            />
+          )}
           {mode === "signup" && (
             <PasswordField
               label={t("auth_confirm_password")}
@@ -149,23 +178,43 @@ export default function LoginPage() {
             />
           )}
           <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "…" : mode === "signin" ? t("auth_sign_in") : t("auth_sign_up")}
+            {busy
+              ? "…"
+              : mode === "signin"
+                ? t("auth_sign_in")
+                : mode === "signup"
+                  ? t("auth_sign_up")
+                  : t("forgot_password_submit")}
           </Button>
+          {mode === "signin" && (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("forgot");
+                setError(null);
+                setNotice(null);
+                setPassword("");
+              }}
+              className="block w-full mt-3 text-center text-xs text-app-text-muted hover:text-app-text transition-colors"
+            >
+              {t("auth_forgot_password")}
+            </button>
+          )}
         </form>
 
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          className="w-full mt-8"
           onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
+            setMode(mode === "signup" ? "signin" : mode === "forgot" ? "signin" : "signup");
             setError(null);
             setNotice(null);
             setConfirmPassword("");
             setUsername("");
           }}
-          className="mt-4 text-sm text-app-text-secondary hover:text-app-text transition-colors"
         >
           {mode === "signin" ? t("auth_toggle_to_signup") : t("auth_toggle_to_signin")}
-        </button>
+        </Button>
       </div>
     </div>
   );

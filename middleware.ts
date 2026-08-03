@@ -41,9 +41,20 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Signing in/up is how a session is created in the first place — these
-  // routes must be reachable without one.
-  if (pathname === "/api/auth/login" || pathname === "/api/auth/signup") {
+  // Signing in/up is how a session is created in the first place, and password
+  // recovery is for people who can't sign in at all — these must be reachable
+  // without a session. The reset routes carry their own proof: a token from the
+  // emailed link, verified server-side.
+  const publicApiRoutes = [
+    "/api/auth/login",
+    "/api/auth/signup",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
+  ];
+  if (publicApiRoutes.includes(pathname)) {
+    return NextResponse.next();
+  }
+  if (pathname.startsWith("/reset-password")) {
     return NextResponse.next();
   }
 

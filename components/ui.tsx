@@ -89,7 +89,7 @@ export function Button({
 }: {
   children: React.ReactNode;
   onClick?: () => void;
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "outline";
   type?: "button" | "submit";
   disabled?: boolean;
   className?: string;
@@ -103,6 +103,10 @@ export function Button({
       ? "bg-app-surface border border-app-border text-app-text hover:border-app-border-strong hover:-translate-y-px"
       : variant === "danger"
       ? "bg-app-danger text-white hover:brightness-110"
+      : variant === "outline"
+      ? // Same accent as the primary button, but carried by the text and border
+        // only — a secondary action that stays visually related to the main one.
+        "border border-app-accent text-app-accent hover:bg-app-accent-soft hover:-translate-y-px"
       : "text-app-text-secondary hover:bg-glass-subtle hover:text-app-text";
   return (
     <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${styles} ${className}`}>

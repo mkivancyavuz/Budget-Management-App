@@ -8,7 +8,7 @@ import {
   totalCashOnHand,
   categoryDisplayName,
   renderTransactionLabel,
-  transactionOutflow,
+  expenseSignedAmount,
 } from "@/lib/ledger";
 import { Card, Badge } from "@/components/ui";
 import { AnimatedCurrency } from "@/components/AnimatedNumber";
@@ -75,10 +75,12 @@ export default function LogPage() {
     return cat ? categoryDisplayName(cat, t) : account;
   }
 
-  // Transactions that represent money actually leaving: shown as one negative
-  // total rather than the underlying double-entry postings.
+  // Transactions that represent money actually leaving: shown as one signed
+  // total rather than the underlying double-entry postings. Corrections made
+  // from "Gider Dağılımı" are included, and can be positive when an amount was
+  // lowered.
   function isExpense(type: string) {
-    return type === "allocate" || type === "spend";
+    return type === "allocate" || type === "spend" || type === "adjustment";
   }
 
   // Money coming in only ever lands in one place, so naming the account
@@ -134,12 +136,18 @@ export default function LogPage() {
                 <div className="text-right shrink-0">
                   {isExpense(tx.type) ? (
                     // An expense is money going out, so show it as a single
-                    // negative figure. Listing the raw postings here showed the
+                    // signed figure. Listing the raw postings here showed the
                     // cash side as -X and the category side as +X, which read as
                     // if the expense had added money somewhere.
-                    <p className="text-xs text-app-danger">
-                      {expenseAccountName(tx)}: {formatCurrency(-transactionOutflow(tx))}
-                    </p>
+                    (() => {
+                      const signed = expenseSignedAmount(tx);
+                      return (
+                        <p className={`text-xs ${signed < 0 ? "text-app-danger" : "text-app-success"}`}>
+                          {expenseAccountName(tx)}: {signed >= 0 ? "+" : ""}
+                          {formatCurrency(signed)}
+                        </p>
+                      );
+                    })()
                   ) : isInflow(tx.type) ? (
                     <p className="text-xs text-app-success">
                       +{formatCurrency(tx.postings.reduce((sum, p) => sum + p.amount, 0))}
