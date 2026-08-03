@@ -168,6 +168,73 @@ body {
   animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* --- Millionaire celebration (components/CashRain.tsx) ------------------- */
+
+/* Notes fall past the bottom of the viewport while tumbling. Distance is set
+   in vh so it clears any screen height. */
+@keyframes money-fall {
+  0% {
+    transform: translateY(-15vh) rotate(var(--spin-from));
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(115vh) rotate(var(--spin-to));
+    opacity: 0;
+  }
+}
+
+/* The big sign punches in past its final size, settles, then fades out. */
+@keyframes jackpot-sign {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  25% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.1);
+    opacity: 0;
+  }
+}
+
+.animate-money-fall {
+  animation-name: money-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+.animate-jackpot-sign {
+  animation: jackpot-sign 4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Anyone who has asked the OS for less motion gets the celebration as a plain
+   fade instead of falling notes. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-money-fall {
+    animation: none;
+    opacity: 0;
+  }
+  .animate-jackpot-sign {
+    animation: rise 0.4s ease-out both;
+  }
+}
+
 .bar-shimmer::after {
   content: "";
   position: absolute;

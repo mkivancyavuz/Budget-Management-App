@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useLanguage } from "@/lib/i18n";
 import {
@@ -23,6 +23,7 @@ import { IncomeTrendChart } from "@/components/IncomeTrendChart";
 import { ProfitTrendChart } from "@/components/ProfitTrendChart";
 import { CategoryPieChart } from "@/components/CategoryPieChart";
 import { CategoryManager } from "@/components/CategoryManager";
+import { CashRain } from "@/components/CashRain";
 import { AnimatedCurrency } from "@/components/AnimatedNumber";
 import {
   IncomeForm,
@@ -30,6 +31,9 @@ import {
   InitialBalanceForm,
   PayCreditCardForm,
 } from "@/components/ActionForms";
+
+/** Unused-cash level that triggers the celebration. */
+const CELEBRATION_THRESHOLD = 1_000_000;
 
 type ModalKind =
   | "income"
@@ -46,11 +50,31 @@ export default function DashboardPage() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
 
+  // Computed before the loading guard so the hooks below always run in the same
+  // order, whatever the load state.
+  const free = loading ? 0 : unallocatedCash(state.transactions);
+
+  // Millionaire celebration. Fires on the *crossing* of the threshold, not on
+  // being above it: the first observed value only seeds the ref, so someone who
+  // is already past a million doesn't get showered on every page load.
+  const [celebrate, setCelebrate] = useState(false);
+  const wasOverThreshold = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (loading) return;
+    const isOver = free >= CELEBRATION_THRESHOLD;
+    if (wasOverThreshold.current === null) {
+      wasOverThreshold.current = isOver;
+      return;
+    }
+    if (isOver && !wasOverThreshold.current) setCelebrate(true);
+    wasOverThreshold.current = isOver;
+  }, [free, loading]);
+
   if (loading) {
     return <p className="text-sm text-app-text-secondary">{t("loading")}</p>;
   }
 
-  const free = unallocatedCash(state.transactions);
   const insights = computeIncomeInsights(state.transactions);
   const profitMonths = monthlyProfitTotals(state.transactions);
   const debt = creditCardDebt(state.transactions);
@@ -86,6 +110,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {celebrate && <CashRain onDone={() => setCelebrate(false)} />}
+
       {!hasAnyIncomeHistory && (
         <Card className="border-app-border bg-glass">
           <p className="text-sm text-app-text-secondary mb-3">{t("get_started_msg")}</p>
