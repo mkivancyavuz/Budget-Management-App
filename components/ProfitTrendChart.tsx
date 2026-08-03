@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { MonthlyProfit, formatCurrency } from "@/lib/ledger";
+import { MonthlyProfit, formatCurrency, formatCurrencyCompact } from "@/lib/ledger";
 import { useLanguage } from "@/lib/i18n";
 
 export function ProfitTrendChart({ months }: { months: MonthlyProfit[] }) {
@@ -14,13 +14,21 @@ export function ProfitTrendChart({ months }: { months: MonthlyProfit[] }) {
 
   return (
     <div>
-      <div className="flex items-end gap-3 h-36">
+      {/* min-w-0 on the columns lets them shrink below their label width;
+          without it six labels force the row wider than the card on a phone. */}
+      <div className="flex items-end gap-1.5 sm:gap-3 h-32 sm:h-36">
         {recent.map((m) => {
           const heightPct = Math.max(4, (Math.abs(m.profit) / max) * 100);
           const isPositive = m.profit >= 0;
           return (
-            <div key={m.month} className="flex-1 flex flex-col items-center justify-end h-full">
-              <span className="text-[10px] text-app-text-secondary mb-1">{formatCurrency(m.profit)}</span>
+            <div key={m.month} className="flex-1 min-w-0 flex flex-col items-center justify-end h-full">
+              {/* Compact amount on phones, full amount from sm up. */}
+              <span className="sm:hidden text-[9px] leading-tight text-app-text-secondary mb-1 whitespace-nowrap">
+                {formatCurrencyCompact(m.profit)}
+              </span>
+              <span className="hidden sm:block text-[10px] text-app-text-secondary mb-1 whitespace-nowrap">
+                {formatCurrency(m.profit)}
+              </span>
               <div
                 className="w-full rounded-t-md"
                 style={{ height: `${heightPct}%`, backgroundColor: isPositive ? "#22c55e" : "#ef4444" }}

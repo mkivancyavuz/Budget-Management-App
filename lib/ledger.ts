@@ -255,6 +255,22 @@ export function formatCurrency(amount: number, currency = "TRY"): string {
   }).format(amount);
 }
 
+/** Short form for tight spaces — "₺12,5B" instead of "₺12.500,00". Used for the
+ * per-bar labels in the trend charts, where six full amounts can't fit across a
+ * phone screen. */
+export function formatCurrencyCompact(amount: number, currency = "TRY"): string {
+  return new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency,
+    currencyDisplay: "narrowSymbol",
+    notation: "compact",
+    // minimum 0 drops the trailing ",0" that currency style would otherwise
+    // force on round values ("₺850" rather than "₺850,0").
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(amount);
+}
+
 export function newId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
