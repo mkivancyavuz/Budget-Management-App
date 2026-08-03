@@ -8,6 +8,7 @@ import { AuthProvider } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
 import { Footer } from "@/components/Footer";
+import { SiteBackground } from "@/components/SiteBackground";
 import { SupabaseSetupNotice } from "@/components/SupabaseSetupNotice";
 
 export const metadata: Metadata = {
@@ -58,7 +59,11 @@ export default function RootLayout({
             <LanguageProvider>
               <AuthProvider>
                 <StoreProvider>
-                  <div className="flex min-h-screen w-full gap-3 p-3">
+                  <SiteBackground />
+                  {/* relative z-10: the glow layer above is positioned at z-0,
+                      and positioned elements paint over non-positioned in-flow
+                      blocks — without this the backdrop would cover the app. */}
+                  <div className="relative z-10 flex min-h-screen w-full gap-3 p-3">
                     <Sidebar />
                     <main className="flex-1 min-w-0 flex flex-col">
                       <MobileNav />

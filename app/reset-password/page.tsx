@@ -13,6 +13,7 @@ import { Wallet } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { Button, ErrorBanner } from "@/components/ui";
 import { PasswordField } from "@/components/PasswordField";
+import { AuthBackground } from "@/components/AuthBackground";
 
 export default function ResetPasswordPage() {
   const { t, lang, setLang } = useLanguage();
@@ -81,8 +82,9 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-app-bg">
-      <div className="absolute top-4 right-4 flex items-center rounded-xl border border-app-border overflow-hidden text-xs font-semibold">
+    <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-app-bg">
+      <AuthBackground />
+      <div className="absolute top-4 right-4 z-10 flex items-center rounded-xl border border-app-border bg-app-surface/80 backdrop-blur overflow-hidden text-xs font-semibold">
         <button
           onClick={() => setLang("tr")}
           className={`px-3 py-2 transition-colors ${lang === "tr" ? "bg-app-accent text-white" : "text-app-text-secondary"}`}
@@ -97,15 +99,16 @@ export default function ResetPasswordPage() {
         </button>
       </div>
 
-      <div className="w-full max-w-sm rounded-3xl border border-app-border bg-glass backdrop-blur-xl p-7">
-        <div className="flex items-center gap-2.5 mb-6">
-          <div className="w-9 h-9 rounded-xl bg-app-accent flex items-center justify-center shadow-[0_4px_16px_rgba(99,102,241,0.35)]">
-            <Wallet size={16} className="text-white" />
+      <div className="relative z-10 w-full max-w-sm xl:max-w-md 2xl:max-w-lg rounded-3xl border border-app-border bg-app-surface/80 backdrop-blur-2xl p-7 xl:p-9 2xl:p-10 shadow-2xl">
+        <div className="flex items-center gap-2.5 mb-6 2xl:mb-7">
+          <div className="w-9 h-9 2xl:w-11 2xl:h-11 rounded-xl bg-app-accent flex items-center justify-center shadow-[0_4px_16px_rgba(99,102,241,0.35)]">
+            <Wallet size={16} className="text-white 2xl:hidden" />
+            <Wallet size={20} className="text-white hidden 2xl:block" />
           </div>
-          <p className="text-[15px] font-semibold tracking-tight text-app-text">{t("app_name")}</p>
+          <p className="text-[15px] 2xl:text-base font-semibold tracking-tight text-app-text">{t("app_name")}</p>
         </div>
 
-        <h1 className="text-lg font-semibold text-app-text mb-1">{t("reset_password_title")}</h1>
+        <h1 className="text-lg xl:text-xl 2xl:text-2xl font-semibold text-app-text mb-1">{t("reset_password_title")}</h1>
 
         {done ? (
           <>
