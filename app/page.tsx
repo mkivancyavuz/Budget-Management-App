@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useLanguage } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import {
   unallocatedCash,
   computeIncomeInsights,
@@ -35,6 +36,10 @@ import {
 /** Unused-cash level that triggers the celebration. */
 const CELEBRATION_THRESHOLD = 1_000_000;
 
+/** Remembers, per account, that the celebration has already played — so it
+ * doesn't repeat on every reload or store refresh. */
+const CELEBRATION_STORAGE_PREFIX = "budget-celebrated-1m-";
+
 type ModalKind =
   | "income"
   | "allocate"
@@ -46,6 +51,7 @@ type ModalKind =
 export default function DashboardPage() {
   const { state, loading, loadDemoData, clearAll } = useStore();
   const { t, lang } = useLanguage();
+  const { user } = useAuth();
   const [modal, setModal] = useState<ModalKind>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -54,22 +60,55 @@ export default function DashboardPage() {
   // order, whatever the load state.
   const free = loading ? 0 : unallocatedCash(state.transactions);
 
-  // Millionaire celebration. Fires on the *crossing* of the threshold, not on
-  // being above it: the first observed value only seeds the ref, so someone who
-  // is already past a million doesn't get showered on every page load.
+  // Millionaire celebration.
+  //
+  // An in-memory "was it over last render" flag isn't enough: the store briefly
+  // reports 0 while it reloads (which happens whenever the auth user object is
+  // refreshed), so the balance appears to dip under the threshold and cross it
+  // again, replaying the animation on unrelated clicks. The fact that this
+  // account has already celebrated is therefore persisted, and only cleared
+  // once the balance genuinely drops back below the threshold — so it fires
+  // once per real crossing and survives reloads.
   const [celebrate, setCelebrate] = useState(false);
-  const wasOverThreshold = useRef<boolean | null>(null);
+
+  // Stable identity, so <CashRain> isn't handed a fresh callback on every
+  // render of this page.
+  const endCelebration = useCallback(() => setCelebrate(false), []);
 
   useEffect(() => {
-    if (loading) return;
+    // Only act on readings backed by real, loaded data.
+    //
+    // The store swaps in an *empty* state (initialized: true, loading: false)
+    // whenever `user` is momentarily null — which happens on any transient
+    // /api/auth/me hiccup or auth refresh. That reading looks like a balance of
+    // 0, so without these guards it would clear the "already celebrated" flag
+    // and replay the animation as soon as the real data came back. That was the
+    // repeat-on-unrelated-clicks bug.
+    if (loading || !state.initialized || !user) return;
+    if (state.transactions.length === 0) return;
+
+    const key = `${CELEBRATION_STORAGE_PREFIX}${user.id}`;
     const isOver = free >= CELEBRATION_THRESHOLD;
-    if (wasOverThreshold.current === null) {
-      wasOverThreshold.current = isOver;
-      return;
+
+    let alreadyCelebrated = false;
+    try {
+      alreadyCelebrated = window.localStorage.getItem(key) === "1";
+    } catch {
+      // Private mode or blocked storage — fall back to celebrating each time
+      // rather than crashing.
     }
-    if (isOver && !wasOverThreshold.current) setCelebrate(true);
-    wasOverThreshold.current = isOver;
-  }, [free, loading]);
+
+    if (isOver && !alreadyCelebrated) {
+      setCelebrate(true);
+      try {
+        window.localStorage.setItem(key, "1");
+      } catch {}
+    } else if (!isOver && alreadyCelebrated) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {}
+    }
+  }, [free, loading, state.initialized, state.transactions.length, user]);
 
   if (loading) {
     return <p className="text-sm text-app-text-secondary">{t("loading")}</p>;
@@ -110,7 +149,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {celebrate && <CashRain onDone={() => setCelebrate(false)} />}
+      {celebrate && <CashRain onDone={endCelebration} />}
 
       {!hasAnyIncomeHistory && (
         <Card className="border-app-border bg-glass">

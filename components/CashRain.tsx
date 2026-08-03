@@ -7,7 +7,7 @@
 // is CSS keyframes (see globals.css), so this costs nothing to load. The layer
 // is aria-hidden and pointer-events-none: decorative, and it must never
 // swallow a click while it's on screen.
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { playCashSound } from "@/lib/sound";
 
 // The overlay must outlive its slowest note, or late ones get cut off halfway
@@ -55,16 +55,27 @@ export function CashRain({ onDone }: { onDone: () => void }) {
     []
   );
 
+  // Held in a ref so the effect below can have empty deps. `onDone` is usually
+  // an inline arrow from the parent, i.e. a new function on every render — with
+  // it in the dep array the effect re-ran on every unrelated re-render, which
+  // replayed the sound and reset the timers while the animation was still on
+  // screen.
+  const onDoneRef = useRef(onDone);
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
+
+  // Mount only: the sound plays once and the teardown is scheduled once.
   useEffect(() => {
     playCashSound();
-    const done = setTimeout(onDone, DURATION_MS);
+    const done = setTimeout(() => onDoneRef.current(), DURATION_MS);
     // Fade the whole layer slightly before unmount so nothing pops out.
     const fade = setTimeout(() => setLeaving(true), DURATION_MS - 600);
     return () => {
       clearTimeout(done);
       clearTimeout(fade);
     };
-  }, [onDone]);
+  }, []);
 
   return (
     <div
