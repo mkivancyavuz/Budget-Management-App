@@ -67,3 +67,37 @@ create policy buffer_settings_tenant_isolation on public.buffer_settings
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Server-side sessions. The app does NOT rely on the browser holding a
+-- Supabase JWT (no localStorage, no client-readable auth cookie). Instead,
+-- signing in creates a row here and the browser only ever gets an opaque,
+-- httpOnly `sid` cookie referencing this row's id. Every request's "guard"
+-- (see middleware.ts) and every data API route look up this table by that id
+-- to decide whether the caller is signed in — the actual identity check
+-- happens against Postgres on every request, not by decoding a token
+-- client-side. RLS is enabled with NO policies, so only the service-role key
+-- (which bypasses RLS) can ever read or write this table — anon/authenticated
+-- requests are refused outright, even if someone got hold of a row id.
+create extension if not exists pgcrypto;
+
+create table if not exists public.sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+
+create index if not exists sessions_user_id_idx on public.sessions (user_id);
+
+alter table public.sessions enable row level security;
+
+-- Storage bucket for uploaded profile photos. Public-read so an <img> tag can
+-- load the avatar without a signed URL, but writes only ever happen
+-- server-side through app/api/account/avatar (service-role key), which files
+-- each upload under a path prefixed by the uploader's own user id. No RLS
+-- policies are added for anon/authenticated roles, so a browser cannot write
+-- here directly even though it can read.
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do update set public = true;

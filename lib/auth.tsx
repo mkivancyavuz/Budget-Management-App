@@ -1,16 +1,19 @@
 "use client";
 
-// Client-side auth context. Wraps the Supabase session so any component can
-// read the current user (== the current tenant) and sign out. The actual
-// tenant isolation happens in Postgres (RLS keyed off auth.uid()), not here —
-// this context just exposes who is signed in for UI purposes.
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+// Client-side auth context. The browser never holds a Supabase session (no
+// localStorage, no client-readable cookie with a JWT in it) — it only ever
+// carries an opaque httpOnly `sid` cookie that the server resolves against
+// the `sessions` table on every request (see lib/serverSession.ts and
+// middleware.ts). This context just asks our own /api/auth/me endpoint who
+// that resolves to, for UI purposes; it has no way to read or forge a user
+// itself.
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import type { User } from "@supabase/supabase-js";
-import { createClient } from "./supabase/client";
 
 interface AuthShape {
   user: User | null;
   loading: boolean;
+  refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -19,25 +22,34 @@ const AuthContext = createContext<AuthShape | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = useMemo(() => createClient(), []);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/me", { cache: "no-store" });
+      if (!res.ok) {
+        setUser(null);
+        return;
+      }
+      const body = await res.json();
+      setUser((body.user as User) ?? null);
+    } catch {
+      setUser(null);
+    }
+  }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+    (async () => {
+      await refresh();
       setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, [supabase]);
+    })();
+  }, [refresh]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
   };
 
-  const value = useMemo(() => ({ user, loading, signOut }), [user, loading]);
+  const value = useMemo(() => ({ user, loading, refresh, signOut }), [user, loading, refresh]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

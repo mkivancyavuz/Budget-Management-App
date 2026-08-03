@@ -1,4 +1,4 @@
-// Server component shown instead of the whole app when NEXT_PUBLIC_SUPABASE_URL /
+// Server component shown instead of the whole app when NEXT_PUBLIC_SUPABASE_ANON_KEY /
 // NEXT_PUBLIC_SUPABASE_ANON_KEY aren't set. Without them, createBrowserClient()
 // throws immediately — better to explain what's missing than crash with a
 // generic runtime error.
@@ -23,9 +23,9 @@ export function SupabaseSetupNotice() {
             üzerinde ücretsiz bir proje oluşturun.
           </li>
           <li>Proje panelinde SQL Editor → New query açın, <code>supabase/schema.sql</code> dosyasının içeriğini yapıştırıp çalıştırın.</li>
-          <li>Project Settings → API sekmesinden Project URL ve anon public key değerlerini kopyalayın.</li>
+          <li>Project Settings → API sekmesinden Project URL, anon public key ve service_role key değerlerini kopyalayın.</li>
           <li>
-            Proje klasöründeki <code>.env.local.example</code> dosyasını <code>.env.local</code> olarak kopyalayıp bu iki değeri girin.
+            Proje klasöründeki <code>.env.local.example</code> dosyasını <code>.env.local</code> olarak kopyalayıp bu üç değeri girin. <code>SUPABASE_SERVICE_ROLE_KEY</code> artık zorunlu — giriş/oturum kontrolü veritabanına bu anahtarla sorgu atarak yapılıyor.
           </li>
           <li>Geliştirme sunucusunu yeniden başlatın (<code>npm run dev</code>).</li>
         </ol>

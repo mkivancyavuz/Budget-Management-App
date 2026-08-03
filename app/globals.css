@@ -78,7 +78,8 @@
   --color-glass-strong: var(--glass-strong);
   --color-glass-subtle: var(--glass-subtle);
   --color-overlay: var(--overlay);
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 html,
@@ -87,11 +88,43 @@ body {
   color: var(--text);
 }
 
+/* Hide the native up/down stepper arrows on every <input type="number">.
+   They're visually noisy against the app's custom inputs and the amounts
+   here are typed, not nudged. The input still accepts numeric input and
+   keyboard arrow keys — only the rendered buttons are removed. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+/* Browsers force an opaque (often yellow/white) background on autofilled
+   inputs, which breaks the app's dark glass inputs. Force it back to the
+   theme surface color so autofilled fields (e.g. email/password on login)
+   look the same as untouched ones. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: inset 0 0 0px 1000px var(--surface);
+}
+
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.011em;
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
 ::-webkit-scrollbar {
@@ -139,7 +172,12 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.25),
+    transparent
+  );
   animation: shimmer 2.4s ease-in-out infinite;
 }
 
@@ -165,9 +203,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: 6px;
   padding: 3px;
   margin-right: -2px;
-  transition: opacity 0.2s ease, background-color 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    background-color 0.2s ease;
 }
-:root[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+:root[data-theme="light"]
+  input[type="date"]::-webkit-calendar-picker-indicator {
   filter: none;
   opacity: 0.55;
 }

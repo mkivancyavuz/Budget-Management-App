@@ -2,7 +2,7 @@
 // Nothing in here mutates state — every balance is computed fresh from
 // `transactions`, so the UI can never show numbers that drift from the log.
 
-import { Transaction, UNALLOCATED, BUFFER, Category } from "./types";
+import { Transaction, UNALLOCATED, BUFFER, CREDIT_CARD, Category } from "./types";
 
 /** Sum of all postings for a given account (unallocated, buffer, or a category id). */
 export function accountBalance(transactions: Transaction[], account: string): number {
@@ -21,6 +21,13 @@ export function unallocatedCash(transactions: Transaction[]): number {
 
 export function bufferBalance(transactions: Transaction[]): number {
   return accountBalance(transactions, BUFFER);
+}
+
+/** How much is currently owed on the credit card, as a positive number.
+ * The account balance itself is <= 0 (more negative = more debt), so this
+ * just flips the sign for display purposes. */
+export function creditCardDebt(transactions: Transaction[]): number {
+  return round2(-accountBalance(transactions, CREDIT_CARD));
 }
 
 export function categoryBalances(
@@ -65,13 +72,61 @@ export function monthlyIncomeTotals(transactions: Transaction[]): MonthlyIncome[
   return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
 }
 
+/** Total outflow recorded by a transaction — the sum of all its negative
+ * postings. For a plain spend (one posting) this is just that posting; for
+ * an allocate/spend that's partly covered by debt (two negative postings:
+ * the real-cash side and the debt side), summing both gives the full amount
+ * the user actually spent, regardless of how it was funded. */
+export function transactionOutflow(tx: Transaction): number {
+  return round2(-tx.postings.filter((p) => p.amount < 0).reduce((sum, p) => sum + p.amount, 0));
+}
+
+/** Signed effect of a manual "adjustment" transaction on the category's
+ * spend total: increasing the category's balance counts as more spend,
+ * decreasing it counts as less — unlike spend/allocate, this can go either
+ * way, so we read the actual signed posting on that category rather than
+ * transactionOutflow() (which only ever sums negative postings). */
+function adjustmentEffect(tx: Transaction): { categoryId: string; amount: number } | null {
+  if (tx.type !== "adjustment") return null;
+  const categoryId = tx.meta?.categoryId;
+  if (!categoryId) return null;
+  const posting = tx.postings.find((p) => p.account === categoryId);
+  if (!posting) return null;
+  return { categoryId, amount: posting.amount };
+}
+
+/** Total spend per category (spend/allocate transactions, plus manual
+ * balance corrections), for the expense-distribution pie chart. Keyed by
+ * category id. */
+export function categoryExpenseTotals(transactions: Transaction[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const tx of transactions) {
+    if (tx.type === "spend" || tx.type === "allocate") {
+      const categoryId = tx.meta?.categoryId;
+      if (!categoryId) continue;
+      map[categoryId] = round2((map[categoryId] ?? 0) + transactionOutflow(tx));
+      continue;
+    }
+    const adj = adjustmentEffect(tx);
+    if (adj) {
+      map[adj.categoryId] = round2((map[adj.categoryId] ?? 0) + adj.amount);
+    }
+  }
+  return map;
+}
+
 export function monthlyExpenseTotals(transactions: Transaction[]): MonthlyIncome[] {
   const map = new Map<string, MonthlyIncome>();
   for (const tx of transactions) {
-    if (tx.type !== "spend" && tx.type !== "allocate") continue;
+    let amt: number | null = null;
+    if (tx.type === "spend" || tx.type === "allocate") {
+      amt = transactionOutflow(tx);
+    } else {
+      const adj = adjustmentEffect(tx);
+      if (adj) amt = adj.amount;
+    }
+    if (amt === null) continue;
     const month = tx.date.slice(0, 7);
-    const outgoing = tx.postings.find((p) => p.amount < 0);
-    const amt = outgoing ? -outgoing.amount : 0;
     const existing = map.get(month);
     if (existing) {
       existing.total = round2(existing.total + amt);

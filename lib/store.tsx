@@ -1,18 +1,39 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
-import { AppState, Transaction, Category, UNALLOCATED, BUFFER } from "./types";
+import { AppState, Transaction, Category, UNALLOCATED, BUFFER, CREDIT_CARD } from "./types";
 import { newId, unallocatedCash, accountBalance, round2, formatCurrency } from "./ledger";
 import { buildSeedState } from "./seed";
 import { useLanguage } from "./i18n";
 import { useAuth } from "./auth";
-import { createClient } from "./supabase/client";
+import { categoryFromRow, transactionFromRow } from "./rows";
 
 // Persistence: every category/transaction/buffer-setting row lives in a
 // shared Supabase/Postgres table, scoped to the signed-in user via a
 // `user_id` column (the tenant discriminator) and enforced by Row Level
 // Security (see supabase/schema.sql) — never localStorage, and never a
-// per-tenant database. See lib/auth.tsx for the session/user context.
+// per-tenant database. The browser never talks to Supabase directly though:
+// every read/write goes through /api/data, which resolves the caller's
+// identity from our own server-side `sessions` table (see
+// lib/serverSession.ts) rather than trusting a client-held token. See
+// lib/auth.tsx for the session/user context.
+
+async function callApi(op: string, payload?: unknown): Promise<{ ok: true; data: any } | { ok: false; error: string }> {
+  try {
+    const res = await fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op, payload }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.error) {
+      return { ok: false, error: body.error ?? "Something went wrong." };
+    }
+    return { ok: true, data: body };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Network error." };
+  }
+}
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -30,18 +51,14 @@ interface StoreShape {
     date: string;
     note?: string;
   }) => Promise<ActionResult>;
-  spend: (input: {
-    categoryId: string;
-    amount: number;
-    date: string;
-    note?: string;
-    coverShortfallFrom?: "unallocated" | "buffer" | null;
-  }) => Promise<ActionResult>;
+  spend: (input: { categoryId: string; amount: number; date: string; note?: string }) => Promise<ActionResult>;
   bufferDraw: (input: { toCategoryId: string; amount: number; date: string; reason: string }) => Promise<ActionResult>;
   bufferContribute: (input: { amount: number; date: string; note?: string }) => Promise<ActionResult>;
+  payCreditCard: (input: { amount: number; date: string; note?: string }) => Promise<ActionResult>;
   setInitialBalance: (amount: number, date: string) => Promise<ActionResult>;
   addCategory: (input: { name: string; monthlyTarget: number }) => Promise<ActionResult>;
   updateCategory: (id: string, patch: Partial<Pick<Category, "name" | "monthlyTarget" | "nameKey">>) => Promise<void>;
+  adjustCategoryBalance: (input: { categoryId: string; newAmount: number; date: string }) => Promise<ActionResult>;
   archiveCategory: (id: string) => Promise<void>;
   setBufferSettings: (patch: Partial<AppState["bufferSettings"]>) => Promise<void>;
   loadDemoData: () => Promise<void>;
@@ -61,88 +78,9 @@ function emptyState(): AppState {
   };
 }
 
-// --- Row <-> app-type mapping -------------------------------------------------
-
-interface CategoryRow {
-  id: string;
-  name: string;
-  name_key: string | null;
-  monthly_target: number;
-  is_buffer: boolean;
-  archived: boolean;
-  created_at: string;
-}
-
-interface TransactionRow {
-  id: string;
-  type: Transaction["type"];
-  date: string;
-  created_at: string;
-  postings: Transaction["postings"];
-  label_key: string;
-  label_params: Transaction["labelParams"] | null;
-  note: string | null;
-  meta: Transaction["meta"] | null;
-}
-
-function categoryFromRow(r: CategoryRow): Category {
-  return {
-    id: r.id,
-    name: r.name,
-    nameKey: r.name_key ?? undefined,
-    monthlyTarget: r.monthly_target,
-    isBuffer: r.is_buffer,
-    archived: r.archived,
-    createdAt: r.created_at,
-  };
-}
-
-function categoryToRow(c: Category, userId: string) {
-  return {
-    id: c.id,
-    user_id: userId,
-    name: c.name,
-    name_key: c.nameKey ?? null,
-    monthly_target: c.monthlyTarget,
-    is_buffer: c.isBuffer ?? false,
-    archived: c.archived ?? false,
-    created_at: c.createdAt,
-  };
-}
-
-function transactionFromRow(r: TransactionRow): Transaction {
-  return {
-    id: r.id,
-    type: r.type,
-    date: r.date,
-    createdAt: r.created_at,
-    postings: r.postings,
-    labelKey: r.label_key,
-    labelParams: r.label_params ?? undefined,
-    note: r.note ?? undefined,
-    meta: r.meta ?? undefined,
-  };
-}
-
-function transactionToRow(tx: Transaction, userId: string) {
-  return {
-    id: tx.id,
-    user_id: userId,
-    type: tx.type,
-    date: tx.date,
-    created_at: tx.createdAt,
-    postings: tx.postings,
-    label_key: tx.labelKey,
-    label_params: tx.labelParams ?? null,
-    note: tx.note ?? null,
-    meta: tx.meta ?? null,
-  };
-}
-
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<AppState>({
     categories: [],
     transactions: [],
@@ -161,19 +99,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
     setLoading(true);
     (async () => {
-      const [catsRes, txRes, bufRes] = await Promise.all([
-        supabase.from("categories").select("*").order("created_at", { ascending: true }),
-        supabase.from("transactions").select("*").order("date", { ascending: true }),
-        supabase.from("buffer_settings").select("*").eq("user_id", user.id).maybeSingle(),
-      ]);
+      const res = await callApi("load");
       if (cancelled) return;
-      const categories = (catsRes.data ?? []).map((r) => categoryFromRow(r as CategoryRow));
-      const transactions = (txRes.data ?? []).map((r) => transactionFromRow(r as TransactionRow));
-      const bufferSettings = bufRes.data
+      if (!res.ok) {
+        setState(emptyState());
+        setLoading(false);
+        return;
+      }
+      const categories = (res.data.categories ?? []).map(categoryFromRow);
+      const transactions = (res.data.transactions ?? []).map(transactionFromRow);
+      const bufferSettings = res.data.bufferSettings
         ? {
-            targetMonths: bufRes.data.target_months,
-            criticalThresholdPct: bufRes.data.critical_threshold_pct,
-            lowThresholdPct: bufRes.data.low_threshold_pct,
+            targetMonths: res.data.bufferSettings.target_months,
+            criticalThresholdPct: res.data.bufferSettings.critical_threshold_pct,
+            lowThresholdPct: res.data.bufferSettings.low_threshold_pct,
           }
         : DEFAULT_BUFFER_SETTINGS;
       setState({ categories, transactions, bufferSettings, initialized: true });
@@ -182,17 +121,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, supabase]);
+  }, [user]);
 
   const addTransaction = useCallback(
     async (tx: Transaction): Promise<ActionResult> => {
       if (!user) return { ok: false, error: t("err_category_not_found") };
-      const { error } = await supabase.from("transactions").insert(transactionToRow(tx, user.id));
-      if (error) return { ok: false, error: error.message };
+      const res = await callApi("insertTransaction", { transaction: tx });
+      if (!res.ok) return { ok: false, error: res.error };
       setState((s) => ({ ...s, transactions: [...s.transactions, tx] }));
       return { ok: true };
     },
-    [supabase, user, t]
+    [user, t]
   );
 
   const findCategory = useCallback((id: string) => state.categories.find((c) => c.id === id), [state.categories]);
@@ -236,19 +175,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (input.amount <= 0) return { ok: false, error: t("err_amount_positive") };
       const cat = findCategory(input.categoryId);
       if (!cat) return { ok: false, error: t("err_category_not_found") };
+      const amt = round2(input.amount);
       const free = unallocatedCash(state.transactions);
-      if (round2(input.amount) > free) {
-        return { ok: false, error: t("err_allocate_exceeds", { free: formatCurrency(free) }) };
-      }
+      // If there isn't enough cash on hand, cover as much as possible from
+      // unallocated and silently push the rest to debt — no blocking error,
+      // no manual choice. The category still receives the full amount, so
+      // expense tracking always reflects what was actually spent.
+      const available = round2(Math.max(0, Math.min(amt, free)));
+      const shortfall = round2(amt - available);
+      const postings = [
+        { account: UNALLOCATED, amount: -available },
+        { account: input.categoryId, amount: amt },
+      ];
+      if (shortfall > 0) postings.push({ account: CREDIT_CARD, amount: -shortfall });
       return addTransaction({
         id: newId("tx"),
         type: "allocate",
         date: input.date,
         createdAt: new Date().toISOString(),
-        postings: [
-          { account: UNALLOCATED, amount: -round2(input.amount) },
-          { account: input.categoryId, amount: round2(input.amount) },
-        ],
+        postings,
         labelKey: "tx_allocate",
         labelParams: { category: cat.name },
         meta: { categoryId: input.categoryId },
@@ -354,65 +299,28 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const spend = useCallback(
-    async (input: {
-      categoryId: string;
-      amount: number;
-      date: string;
-      note?: string;
-      coverShortfallFrom?: "unallocated" | "buffer" | null;
-    }): Promise<ActionResult> => {
+    async (input: { categoryId: string; amount: number; date: string; note?: string }): Promise<ActionResult> => {
       if (input.amount <= 0) return { ok: false, error: t("err_spend_amount") };
       const cat = findCategory(input.categoryId);
       if (!cat) return { ok: false, error: t("err_category_not_found") };
       const bal = accountBalance(state.transactions, input.categoryId);
       const amt = round2(input.amount);
-
-      if (amt > bal) {
-        const shortfall = round2(amt - bal);
-        if (!input.coverShortfallFrom) {
-          return {
-            ok: false,
-            error: t("err_spend_over", { category: cat.name, balance: formatCurrency(bal), shortfall: formatCurrency(shortfall) }),
-          };
-        }
-        const coverAccount = input.coverShortfallFrom === "buffer" ? BUFFER : UNALLOCATED;
-        const coverAvailable = accountBalance(state.transactions, coverAccount);
-        if (shortfall > coverAvailable) {
-          return {
-            ok: false,
-            error: t("err_cover_insufficient", {
-              source: t(input.coverShortfallFrom === "buffer" ? "source_buffer" : "source_unallocated"),
-              available: formatCurrency(coverAvailable),
-              shortfall: formatCurrency(shortfall),
-            }),
-          };
-        }
-        const coverRes = await addTransaction({
-          id: newId("tx"),
-          type: "transfer",
-          date: input.date,
-          createdAt: new Date().toISOString(),
-          postings: [
-            { account: coverAccount, amount: -shortfall },
-            { account: input.categoryId, amount: shortfall },
-          ],
-          labelKey: "tx_cover_shortfall",
-          labelParams: {
-            category: cat.name,
-            source: t(input.coverShortfallFrom === "buffer" ? "source_buffer" : "source_unallocated"),
-          },
-          note: input.note,
-          meta: { categoryId: input.categoryId, coveredFrom: input.coverShortfallFrom },
-        });
-        if (!coverRes.ok) return coverRes;
-      }
+      // Spend whatever the category actually has first; anything beyond that
+      // is automatically pushed to debt — no prompt, no manual choice. The
+      // category is only ever drawn down to zero from this single spend (it
+      // never goes further negative than what this transaction itself covers
+      // with debt), so "cash on hand" stays accurate.
+      const available = round2(Math.max(0, Math.min(amt, bal)));
+      const shortfall = round2(amt - available);
+      const postings = [{ account: input.categoryId, amount: -available }];
+      if (shortfall > 0) postings.push({ account: CREDIT_CARD, amount: -shortfall });
 
       return addTransaction({
         id: newId("tx"),
         type: "spend",
         date: input.date,
         createdAt: new Date().toISOString(),
-        postings: [{ account: input.categoryId, amount: -amt }],
+        postings,
         labelKey: "tx_spend",
         labelParams: { category: cat.name },
         note: input.note,
@@ -420,6 +328,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     },
     [addTransaction, findCategory, state.transactions, t]
+  );
+
+  const payCreditCard = useCallback(
+    async (input: { amount: number; date: string; note?: string }): Promise<ActionResult> => {
+      if (input.amount <= 0) return { ok: false, error: t("err_amount_positive") };
+      const amt = round2(input.amount);
+      const free = unallocatedCash(state.transactions);
+      if (amt > free) {
+        return { ok: false, error: t("err_pay_credit_card_insufficient_funds", { free: formatCurrency(free) }) };
+      }
+      const debt = -accountBalance(state.transactions, CREDIT_CARD);
+      if (amt > round2(debt)) {
+        return { ok: false, error: t("err_pay_exceeds_debt", { debt: formatCurrency(debt) }) };
+      }
+      return addTransaction({
+        id: newId("tx"),
+        type: "pay_credit_card",
+        date: input.date,
+        createdAt: new Date().toISOString(),
+        postings: [
+          { account: UNALLOCATED, amount: -amt },
+          { account: CREDIT_CARD, amount: amt },
+        ],
+        labelKey: "tx_pay_credit_card",
+        note: input.note,
+      });
+    },
+    [addTransaction, state.transactions, t]
   );
 
   const addCategory = useCallback(
@@ -433,86 +369,114 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         monthlyTarget: round2(input.monthlyTarget),
         createdAt: new Date().toISOString(),
       };
-      const { error } = await supabase.from("categories").insert(categoryToRow(category, user.id));
-      if (error) return { ok: false, error: error.message };
+      const res = await callApi("insertCategory", { category });
+      if (!res.ok) return { ok: false, error: res.error };
       setState((s) => ({ ...s, categories: [...s.categories, category] }));
       return { ok: true };
     },
-    [supabase, user, t]
+    [user, t]
   );
 
   const updateCategory = useCallback(
     async (id: string, patch: Partial<Pick<Category, "name" | "monthlyTarget" | "nameKey">>) => {
       if (!user) return;
-      const dbPatch: Record<string, unknown> = {};
-      if ("name" in patch) dbPatch.name = patch.name;
-      if ("monthlyTarget" in patch) dbPatch.monthly_target = patch.monthlyTarget;
-      if ("nameKey" in patch) dbPatch.name_key = patch.nameKey ?? null;
-      const { error } = await supabase.from("categories").update(dbPatch).eq("id", id).eq("user_id", user.id);
-      if (error) return;
+      const res = await callApi("updateCategory", { id, patch });
+      if (!res.ok) return;
       setState((s) => ({
         ...s,
         categories: s.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)),
       }));
     },
-    [supabase, user]
+    [user]
   );
 
   const archiveCategory = useCallback(
     async (id: string) => {
       if (!user) return;
-      const { error } = await supabase
-        .from("categories")
-        .update({ archived: true })
-        .eq("id", id)
-        .eq("user_id", user.id);
-      if (error) return;
+      const res = await callApi("archiveCategory", { id });
+      if (!res.ok) return;
       setState((s) => ({
         ...s,
         categories: s.categories.map((c) => (c.id === id ? { ...c, archived: true } : c)),
       }));
     },
-    [supabase, user]
+    [user]
+  );
+
+  // Manual correction for a category's current balance ("Ödenen Tutar" in the
+  // edit-category modal) — e.g. fixing a mis-typed spend amount. Recorded as
+  // its own "adjustment" transaction (not a rewrite of past transactions) so
+  // the ledger stays append-only; the delta between the current balance and
+  // the number the user typed becomes the posting. Increasing the balance
+  // pulls the difference from unallocated cash (falling back to debt if
+  // there isn't enough, same as allocate()); decreasing it always just
+  // returns the difference to unallocated cash.
+  const adjustCategoryBalance = useCallback(
+    async (input: { categoryId: string; newAmount: number; date: string }): Promise<ActionResult> => {
+      const cat = findCategory(input.categoryId);
+      if (!cat) return { ok: false, error: t("err_category_not_found") };
+      if (input.newAmount < 0) return { ok: false, error: t("err_target_negative") };
+      const currentBal = accountBalance(state.transactions, input.categoryId);
+      const target = round2(input.newAmount);
+      const delta = round2(target - currentBal);
+      if (delta === 0) return { ok: true };
+
+      let postings;
+      if (delta > 0) {
+        const free = unallocatedCash(state.transactions);
+        const available = round2(Math.max(0, Math.min(delta, free)));
+        const shortfall = round2(delta - available);
+        postings = [
+          { account: UNALLOCATED, amount: -available },
+          { account: input.categoryId, amount: delta },
+        ];
+        if (shortfall > 0) postings.push({ account: CREDIT_CARD, amount: -shortfall });
+      } else {
+        postings = [
+          { account: input.categoryId, amount: delta },
+          { account: UNALLOCATED, amount: -delta },
+        ];
+      }
+
+      return addTransaction({
+        id: newId("tx"),
+        type: "adjustment",
+        date: input.date,
+        createdAt: new Date().toISOString(),
+        postings,
+        labelKey: "tx_adjustment",
+        labelParams: { category: cat.name },
+        meta: { categoryId: input.categoryId },
+      });
+    },
+    [addTransaction, findCategory, state.transactions, t]
   );
 
   const setBufferSettings = useCallback(
     async (patch: Partial<AppState["bufferSettings"]>) => {
       if (!user) return;
       const merged = { ...state.bufferSettings, ...patch };
-      const { error } = await supabase.from("buffer_settings").upsert({
-        user_id: user.id,
-        target_months: merged.targetMonths,
-        critical_threshold_pct: merged.criticalThresholdPct,
-        low_threshold_pct: merged.lowThresholdPct,
-      });
-      if (error) return;
+      const res = await callApi("upsertBufferSettings", merged);
+      if (!res.ok) return;
       setState((s) => ({ ...s, bufferSettings: merged }));
     },
-    [supabase, user, state.bufferSettings]
+    [user, state.bufferSettings]
   );
 
   const loadDemoData = useCallback(async () => {
     if (!user) return;
     const seed = buildSeedState();
-    await supabase.from("transactions").delete().eq("user_id", user.id);
-    await supabase.from("categories").delete().eq("user_id", user.id);
-    const { error: catErr } = await supabase
-      .from("categories")
-      .insert(seed.categories.map((c) => categoryToRow(c, user.id)));
-    const { error: txErr } = await supabase
-      .from("transactions")
-      .insert(seed.transactions.map((tx) => transactionToRow(tx, user.id)));
-    if (catErr || txErr) return;
+    const res = await callApi("loadDemoData", { categories: seed.categories, transactions: seed.transactions });
+    if (!res.ok) return;
     setState(seed);
-  }, [supabase, user]);
+  }, [user]);
 
   const clearAll = useCallback(async () => {
     if (!user) return;
-    await supabase.from("transactions").delete().eq("user_id", user.id);
-    await supabase.from("categories").delete().eq("user_id", user.id);
-    await supabase.from("buffer_settings").delete().eq("user_id", user.id);
+    const res = await callApi("clearAll");
+    if (!res.ok) return;
     setState(emptyState());
-  }, [supabase, user]);
+  }, [user]);
 
   const value = useMemo<StoreShape>(
     () => ({
@@ -526,9 +490,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       spend,
       bufferDraw,
       bufferContribute,
+      payCreditCard,
       setInitialBalance,
       addCategory,
       updateCategory,
+      adjustCategoryBalance,
       archiveCategory,
       setBufferSettings,
       loadDemoData,
@@ -545,9 +511,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       spend,
       bufferDraw,
       bufferContribute,
+      payCreditCard,
       setInitialBalance,
       addCategory,
       updateCategory,
+      adjustCategoryBalance,
       archiveCategory,
       setBufferSettings,
       loadDemoData,

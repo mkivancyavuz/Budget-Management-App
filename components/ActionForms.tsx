@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useStore } from "@/lib/store";
 import { useLanguage } from "@/lib/i18n";
 import { BUFFER } from "@/lib/types";
-import { accountBalance, unallocatedCash, formatCurrency, categoryDisplayName } from "@/lib/ledger";
+import { accountBalance, unallocatedCash, creditCardDebt, formatCurrency, categoryDisplayName } from "@/lib/ledger";
 import { Button, ErrorBanner } from "./ui";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -195,64 +195,16 @@ export function SpendForm({ onDone }: { onDone: () => void }) {
   const [date, setDate] = useState(todayStr());
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [shortfallPrompt, setShortfallPrompt] = useState<{ shortfall: number } | null>(null);
 
   const bal = accountBalance(state.transactions, categoryId);
-  const bufBal = accountBalance(state.transactions, BUFFER);
-  const free = unallocatedCash(state.transactions);
-
-  async function attempt(coverFrom?: "unallocated" | "buffer") {
-    const res = await spend({ categoryId, amount: parseFloat(amount), date, note, coverShortfallFrom: coverFrom });
-    if (!res.ok) {
-      const amt = parseFloat(amount);
-      if (!coverFrom && amt > bal) {
-        setShortfallPrompt({ shortfall: parseFloat((amt - bal).toFixed(2)) });
-        setError(null);
-      } else {
-        setError(res.error);
-      }
-    } else {
-      onDone();
-    }
-  }
-
-  if (shortfallPrompt) {
-    return (
-      <div>
-        <ErrorBanner
-          message={t("cover_shortfall_msg", {
-            shortfall: formatCurrency(shortfallPrompt.shortfall),
-            balance: formatCurrency(bal),
-          })}
-        />
-        <div className="mt-4 flex flex-col gap-2">
-          <Button
-            variant="secondary"
-            disabled={free < shortfallPrompt.shortfall}
-            onClick={() => void attempt("unallocated")}
-          >
-            {t("cover_from_unallocated", { amount: formatCurrency(free) })}
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={bufBal < shortfallPrompt.shortfall}
-            onClick={() => void attempt("buffer")}
-          >
-            {t("cover_from_buffer", { amount: formatCurrency(bufBal) })}
-          </Button>
-          <Button variant="ghost" onClick={() => setShortfallPrompt(null)}>
-            {t("cancel")}
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <form
       onSubmit={async (e) => {
         e.preventDefault();
-        await attempt(undefined);
+        const res = await spend({ categoryId, amount: parseFloat(amount), date, note });
+        if (!res.ok) setError(res.error);
+        else onDone();
       }}
     >
       <p className="text-sm text-app-text-secondary mb-4">{t("category_balance", { amount: formatCurrency(bal) })}</p>
@@ -442,5 +394,66 @@ export function InitialBalanceForm({ onDone }: { onDone: () => void }) {
       </Field>
       <Button type="submit" className="w-full">{t("set_balance")}</Button>
     </form>
+  );
+}
+
+export function PayCreditCardForm({ onDone }: { onDone: () => void }) {
+  const { state, payCreditCard } = useStore();
+  const { t } = useLanguage();
+  const free = unallocatedCash(state.transactions);
+  const debt = creditCardDebt(state.transactions);
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(todayStr());
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [payingFull, setPayingFull] = useState(false);
+
+  async function handlePayFull() {
+    setError(null);
+    setPayingFull(true);
+    const res = await payCreditCard({ amount: debt, date: todayStr(), note });
+    setPayingFull(false);
+    if (!res.ok) setError(res.error);
+    else onDone();
+  }
+
+  return (
+    <div>
+      <p className="text-sm text-app-text-secondary mb-1">{t("unallocated_available", { amount: formatCurrency(free) })}</p>
+      <p className="text-sm text-app-text-secondary mb-4">{t("current_debt", { amount: formatCurrency(debt) })}</p>
+      {error && (
+        <div className="mb-4">
+          <ErrorBanner message={error} />
+        </div>
+      )}
+      <Button
+        variant="secondary"
+        className="w-full mb-4"
+        disabled={debt <= 0 || payingFull}
+        onClick={() => void handlePayFull()}
+      >
+        {payingFull ? "…" : t("pay_in_full")}
+      </Button>
+      <p className="text-xs text-app-text-muted mb-4 text-center">{t("or_enter_amount")}</p>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const res = await payCreditCard({ amount: parseFloat(amount), date, note });
+          if (!res.ok) setError(res.error);
+          else onDone();
+        }}
+      >
+        <Field label={t("amount_to_pay")}>
+          <input className={`${inputCls} no-spinner`} type="number" inputMode="decimal" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        </Field>
+        <Field label={t("date")}>
+          <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label={t("note_optional")}>
+          <input className={inputCls} type="text" value={note} onChange={(e) => setNote(e.target.value)} />
+        </Field>
+        <Button type="submit" className="w-full">{t("pay_credit_card")}</Button>
+      </form>
+    </div>
   );
 }

@@ -11,10 +11,10 @@ Money can only be allocated to a category if it physically exists in the account
 This app is multi-tenant: every signed-in user only ever sees their own data. It needs a free [Supabase](https://supabase.com) project for auth + database.
 
 1. Create a project at supabase.com (free tier is enough).
-2. In the Supabase dashboard, go to **SQL Editor -> New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `categories`, `transactions`, and `buffer_settings` tables and their Row Level Security policies.
-3. Go to **Project Settings -> API** and copy the **Project URL** and **anon public** key.
-4. Copy `.env.local.example` to `.env.local` and paste those two values in.
-5. (Optional but recommended) In **Authentication -> Providers -> Email**, you can turn off "Confirm email" while developing so new sign-ups don't need to click an email link.
+2. In the Supabase dashboard, go to **SQL Editor -> New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the `categories`, `transactions`, `buffer_settings`, and `sessions` tables with their Row Level Security policies, plus the public `avatars` Storage bucket used for profile photos. (If you set this project up before the `sessions` table or `avatars` bucket existed, just re-run the whole file — every statement in it is idempotent / safe to re-run.)
+3. Go to **Project Settings -> API Keys** and copy the **Project URL**, the **anon public / publishable** key, and the **service_role** key.
+4. Copy `.env.local.example` to `.env.local` and paste all three values in. `SUPABASE_SERVICE_ROLE_KEY` is **required**, not optional — the app's own sign-in guard and every data request validate the caller against the `sessions` table using this key (see "Multi-tenancy & auth" below), so nothing works without it. This key bypasses Row Level Security — never prefix it with `NEXT_PUBLIC_`, never commit it, and in Vercel add it as a server-only environment variable.
+5. (Optional but recommended) In **Authentication -> Sign In / Providers -> Email**, under "User Signups" you can turn off "Confirm email" while developing so new sign-ups don't need to click an email link.
 
 ```bash
 npm install
@@ -45,8 +45,21 @@ The main content container now scales up to `1800px` on very large/ultrawide dis
 ## Multi-tenancy & auth
 
 - **Tenant model**: shared tables, discriminator column — not a database-per-tenant. `categories`, `transactions`, and `buffer_settings` (see `supabase/schema.sql`) all carry a `user_id` column, and Postgres Row Level Security policies (`using (auth.uid() = user_id)`) guarantee a request can only ever read or write rows belonging to the currently authenticated user. The tenant *is* the signed-in user — there's no separate "organization"/"workspace" concept.
-- **Auth**: Supabase Auth (email + password), the free tier of the same Supabase project as the database. `middleware.ts` protects every route except `/login`, redirecting signed-out visitors there and signed-in visitors away from it. `lib/auth.tsx` exposes the current user + `signOut()` to client components; the sidebar/mobile nav show the signed-in email and a sign-out button.
-- **Data layer**: `lib/store.tsx` no longer touches `localStorage` at all — every read/write goes through `lib/supabase/client.ts` (browser) scoped automatically to the logged-in user by RLS. The ledger/derivation logic in `lib/ledger.ts` is unchanged and storage-agnostic, so none of the balance math needed to change.
+- **Sessions live in Postgres, not the browser**: the browser never holds a Supabase JWT — not in `localStorage`, not in a client-readable cookie. Signing in (`app/api/auth/login`) or signing up (`app/api/auth/signup`) verifies the password against Supabase Auth once, server-side, then creates a row in a `sessions` table (`id`, `user_id`, `expires_at`) and hands the browser only an opaque, `httpOnly` cookie (`sid`) pointing at that row — see `lib/serverSession.ts`.
+- **The guard checks the database on every request**: `middleware.ts` reads the `sid` cookie and makes a real query against the `sessions` table (via the service-role key) to confirm a live, unexpired session exists before letting a request through to any page or API route. There's no local JWT decoding — an invalid or revoked session is rejected at the database, not by trusting something the client presents. Signing out (`app/api/auth/logout`) deletes the row outright, so the session dies immediately rather than lingering until a token would've expired on its own.
+- **Data layer**: `lib/store.tsx` no longer touches Supabase (or `localStorage`) directly at all — every read/write goes through `/api/data` (`app/api/data/route.ts`), a single server route that re-validates the `sid` session against the DB, then performs the query itself using the service-role client, always explicitly scoped to that session's `user_id`. The ledger/derivation logic in `lib/ledger.ts` is unchanged and storage-agnostic, so none of the balance math needed to change.
+- **Account management** (`app/api/account/*`, see below) works the same way — every route re-resolves the caller's `user_id` from the `sessions` table before touching anything.
+
+## Profile & account management
+
+`/profile` (linked from the avatar at the top of the sidebar) lets a signed-in user:
+- **Edit their username** — `app/api/account/update-profile/route.ts` resolves the caller's `user_id` from the `sessions` table, then updates `user_metadata.username` via the Supabase Admin API. The username is chosen at sign-up and shown beside the avatar.
+- **Set a profile photo** — `app/api/account/avatar/route.ts` (POST to upload, DELETE to remove) validates the file type and size, stores it in the public `avatars` Storage bucket under a path prefixed with the uploader's own user id, and saves the resulting URL to `user_metadata.avatar_url`. Uploads only ever happen through this route using the service-role key; the browser has no Storage credentials. Replacing or removing a photo deletes the previous file so the bucket doesn't grow unbounded. With no photo set, the avatar falls back to initials on a color, both of which the user picks on the same page (`user_metadata.avatar_color` / `avatar_initials`). `lib/profile.ts` resolves all of this, and `components/Avatar.tsx` renders it, so the sidebar and profile page never disagree.
+- **Change their password** — `app/api/account/update-password/route.ts`, same pattern.
+- **Sign out** — its own dedicated section on the page; calls `app/api/auth/logout`, which deletes the session row.
+- **Delete their account** — `app/api/account/delete/route.ts` resolves the caller's own session, then uses `lib/supabase/admin.ts` (a service-role client, server-only) to call Supabase Auth's admin API and permanently delete the account. Deleting the `auth.users` row cascades automatically to that user's `categories`, `transactions`, `buffer_settings`, and `sessions` rows via the `ON DELETE CASCADE` foreign keys in `supabase/schema.sql` — no extra cleanup code needed. The route only ever acts on the caller's own account (never accepts a target id from the request), so one tenant can't delete another's.
+
+None of these routes ever receive or trust a Supabase JWT from the browser — they all re-derive `user_id` from the `sid` cookie via `lib/serverSession.ts`.
 
 ## Assumptions made
 - **Currency**: single currency (TRY) regardless of UI language, since a freelancer's actual bank balance is in one currency. Easy to change in `lib/ledger.ts` (`formatCurrency`).

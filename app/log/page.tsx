@@ -14,6 +14,7 @@ const typeKey: Record<string, string> = {
   deallocate: "type_deallocate",
   transfer: "type_transfer",
   spend: "type_spend",
+  pay_credit_card: "type_pay_credit_card",
   adjustment: "type_adjustment",
 };
 
@@ -24,6 +25,7 @@ const typeTone: Record<string, "default" | "good" | "warn" | "bad"> = {
   deallocate: "default",
   transfer: "warn",
   spend: "bad",
+  pay_credit_card: "warn",
   adjustment: "default",
 };
 
@@ -39,6 +41,7 @@ export default function LogPage() {
   function accountName(account: string) {
     if (account === "unallocated") return t("account_unallocated");
     if (account === "buffer") return t("account_buffer");
+    if (account === "credit_card") return t("account_credit_card");
     const cat = categories.find((c) => c.id === account);
     return cat ? categoryDisplayName(cat, t) : account;
   }

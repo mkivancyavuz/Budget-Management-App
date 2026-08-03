@@ -3,9 +3,9 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Wallet } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/lib/i18n";
 import { Button, ErrorBanner } from "@/components/ui";
+import { PasswordField } from "@/components/PasswordField";
 
 type Mode = "signin" | "signup";
 
@@ -14,42 +14,51 @@ export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const inputCls =
-    "w-full rounded-xl border border-app-border bg-glass text-app-text px-3 py-2.5 text-sm placeholder:text-app-text-muted focus:outline-none focus:ring-2 focus:ring-app-accent/40 focus:border-app-accent/50 transition-colors";
+    "w-full rounded-xl border border-app-border bg-glass text-app-text px-3 py-2.5 pr-10 text-sm placeholder:text-app-text-muted focus:outline-none focus:ring-2 focus:ring-app-accent/40 focus:border-app-accent/50 transition-colors";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setNotice(null);
+
+    if (mode === "signup" && !username.trim()) {
+      setError(t("err_username_required"));
+      return;
+    }
+
+    if (mode === "signup" && password !== confirmPassword) {
+      setError(t("err_password_mismatch"));
+      return;
+    }
+
     setBusy(true);
-    const supabase = createClient();
     try {
-      if (mode === "signin") {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) {
-          setError(signInError.message);
-          return;
-        }
-        router.push("/");
-        router.refresh();
-      } else {
-        const { error: signUpError, data } = await supabase.auth.signUp({ email, password });
-        if (signUpError) {
-          setError(signUpError.message);
-          return;
-        }
-        if (data.session) {
-          router.push("/");
-          router.refresh();
-        } else {
-          setNotice(t("auth_check_email"));
-        }
+      const res = await fetch(mode === "signin" ? "/api/auth/login" : "/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mode === "signin" ? { email, password } : { email, password, username: username.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.error) {
+        setError(body.error ?? "Something went wrong.");
+        return;
       }
+      if (mode === "signup" && body.needsConfirmation) {
+        setNotice(t("auth_check_email"));
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setBusy(false);
     }
@@ -105,19 +114,40 @@ export default function LoginPage() {
               autoComplete="email"
             />
           </label>
-          <label className="block mb-5">
-            <span className="block text-sm font-medium text-app-text-secondary mb-1.5">{t("auth_password")}</span>
-            <input
-              className={inputCls}
-              type="password"
+          {mode === "signup" && (
+            <label className="block mb-4">
+              <span className="block text-sm font-medium text-app-text-secondary mb-1.5">{t("username")}</span>
+              <input
+                className="w-full rounded-xl border border-app-border bg-glass text-app-text px-3 py-2.5 text-sm placeholder:text-app-text-muted focus:outline-none focus:ring-2 focus:ring-app-accent/40 focus:border-app-accent/50 transition-colors"
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={t("username_placeholder")}
+                autoComplete="username"
+              />
+            </label>
+          )}
+          <PasswordField
+            label={mode === "signup" ? t("auth_create_password") : t("auth_password")}
+            value={password}
+            onChange={setPassword}
+            required
+            minLength={6}
+            autoComplete={mode === "signin" ? "current-password" : "new-password"}
+            className={mode === "signup" ? "block mb-4" : "block mb-5"}
+          />
+          {mode === "signup" && (
+            <PasswordField
+              label={t("auth_confirm_password")}
+              value={confirmPassword}
+              onChange={setConfirmPassword}
               required
               minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              autoComplete="new-password"
+              className="block mb-5"
             />
-          </label>
+          )}
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? "…" : mode === "signin" ? t("auth_sign_in") : t("auth_sign_up")}
           </Button>
@@ -129,6 +159,8 @@ export default function LoginPage() {
             setMode(mode === "signin" ? "signup" : "signin");
             setError(null);
             setNotice(null);
+            setConfirmPassword("");
+            setUsername("");
           }}
           className="mt-4 text-sm text-app-text-secondary hover:text-app-text transition-colors"
         >
