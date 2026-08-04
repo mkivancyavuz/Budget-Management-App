@@ -7,6 +7,7 @@ import { BUFFER } from "@/lib/types";
 import { accountBalance, unallocatedCash, creditCardDebt, formatCurrency, categoryDisplayName } from "@/lib/ledger";
 import { Button, ErrorBanner } from "./ui";
 import { AmountInput } from "./AmountInput";
+import { DateField } from "./DateField";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -54,7 +55,7 @@ export function IncomeForm({ onDone }: { onDone: () => void }) {
       <Field label={t("date_received")}>
         {/* max=today: income is logged when it actually arrives, so a future
             date would count money that hasn't been received yet. */}
-        <input className={inputCls} type="date" required max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
+        <DateField value={date} onChange={setDate} max={todayStr()} />
       </Field>
       <Field label={t("note_optional")}>
         <input className={inputCls} type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("invoice_placeholder")} />
@@ -125,7 +126,7 @@ export function AllocateForm({ onDone }: { onDone: () => void }) {
       <Field label={t("date")}>
         {/* Same rule as income: an expense is recorded once it has happened,
             never dated ahead. */}
-        <input className={inputCls} type="date" required max={todayStr()} value={date} onChange={(e) => setDate(e.target.value)} />
+        <DateField value={date} onChange={setDate} max={todayStr()} />
       </Field>
       <Button type="submit" className="w-full">{t("allocate")}</Button>
     </form>
@@ -181,7 +182,7 @@ export function TransferForm({ onDone }: { onDone: () => void }) {
         <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("date")}>
-        <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        <DateField value={date} onChange={setDate} />
       </Field>
       <Field label={t("note_optional")}>
         <input className={inputCls} type="text" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -231,7 +232,7 @@ export function SpendForm({ onDone }: { onDone: () => void }) {
         <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("date")}>
-        <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        <DateField value={date} onChange={setDate} />
       </Field>
       <Field label={t("note_optional")}>
         <input className={inputCls} type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("what_was_this_for")} />
@@ -297,7 +298,7 @@ export function BufferDrawForm({ onDone }: { onDone: () => void }) {
         <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("date")}>
-        <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        <DateField value={date} onChange={setDate} />
       </Field>
       <Field label={t("reason_required")}>
         <input className={inputCls} type="text" required value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("reason_placeholder")} />
@@ -334,7 +335,7 @@ export function BufferContributeForm({ onDone }: { onDone: () => void }) {
         <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("date")}>
-        <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        <DateField value={date} onChange={setDate} />
       </Field>
       <Button type="submit" className="w-full">{t("contribute_to_buffer")}</Button>
     </form>
@@ -395,7 +396,7 @@ export function InitialBalanceForm({ onDone }: { onDone: () => void }) {
         <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("as_of_date")}>
-        <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        <DateField value={date} onChange={setDate} />
       </Field>
       <Button type="submit" className="w-full">{t("set_balance")}</Button>
     </form>
@@ -452,7 +453,7 @@ export function PayCreditCardForm({ onDone }: { onDone: () => void }) {
           <AmountInput value={amount} onChange={setAmount} required />
         </Field>
         <Field label={t("date")}>
-          <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </Field>
         <Field label={t("note_optional")}>
           <input className={inputCls} type="text" value={note} onChange={(e) => setNote(e.target.value)} />
