@@ -4,6 +4,7 @@ import "./globals.css";
 import { StoreProvider } from "@/lib/store";
 import { LanguageProvider } from "@/lib/i18n";
 import { ThemeProvider, themeInitScript } from "@/lib/theme";
+import { CurrencyProvider } from "@/lib/currency";
 import { AuthProvider } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 import { SiteBackground } from "@/components/SiteBackground";
@@ -55,12 +56,14 @@ export default function RootLayout({
         ) : (
           <ThemeProvider>
             <LanguageProvider>
-              <AuthProvider>
-                <StoreProvider>
-                  <SiteBackground />
-                  <AppShell>{children}</AppShell>
-                </StoreProvider>
-              </AuthProvider>
+              <CurrencyProvider>
+                <AuthProvider>
+                  <StoreProvider>
+                    <SiteBackground />
+                    <AppShell>{children}</AppShell>
+                  </StoreProvider>
+                </AuthProvider>
+              </CurrencyProvider>
             </LanguageProvider>
           </ThemeProvider>
         )}

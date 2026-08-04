@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { LogOut, Trash2, Upload, Camera } from "lucide-react";
+import { LogOut, Trash2, Upload, Camera, Check } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
+import { CURRENCIES, useCurrency } from "@/lib/currency";
 import { AVATAR_COLORS, avatarInfo, displayIdentity } from "@/lib/profile";
 import { Card, Button, ErrorBanner } from "@/components/ui";
 import { Avatar } from "@/components/Avatar";
@@ -25,6 +26,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function ProfilePage() {
   const { user, signOut, refresh } = useAuth();
   const { t, lang } = useLanguage();
+  const { currency, setCurrency } = useCurrency();
 
   const memberSince = user?.created_at
     ? new Intl.DateTimeFormat(lang === "tr" ? "tr-TR" : "en-US", { dateStyle: "long" }).format(
@@ -295,9 +297,12 @@ export default function ProfilePage() {
           fills that height with its submit button pinned to the bottom, so all
           three columns line up. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+        {/* Username and password now share one card — two separate forms inside
+            it, each with its own save button and its own success/error line, so
+            saving a name doesn't imply anything about the password fields. */}
         <Card className="h-full flex flex-col">
           <h2 className="text-sm font-semibold text-app-text mb-4">{t("profile_edit_title")}</h2>
-          <form onSubmit={handleSaveProfile} className="flex flex-col flex-1">
+          <form onSubmit={handleSaveProfile}>
             {profileError && (
               <div className="mb-4">
                 <ErrorBanner message={profileError} />
@@ -317,38 +322,72 @@ export default function ProfilePage() {
                 autoComplete="username"
               />
             </Field>
-
-            <Button type="submit" className="w-full mt-auto" disabled={profileSaving}>
+            <Button type="submit" className="w-full mt-1" disabled={profileSaving}>
               {profileSaving ? "…" : t("save_changes")}
             </Button>
           </form>
+
+          <div className="mt-6 pt-5 border-t border-app-border flex flex-col flex-1">
+            <h3 className="text-sm font-semibold text-app-text mb-4">{t("password_section_title")}</h3>
+            <form onSubmit={handleChangePassword} className="flex flex-col flex-1">
+              {passwordError && (
+                <div className="mb-4">
+                  <ErrorBanner message={passwordError} />
+                </div>
+              )}
+              {passwordSuccess && <p className="text-sm text-app-success mb-4">{t("password_saved")}</p>}
+              <PasswordField
+                label={t("new_password")}
+                value={newPassword}
+                onChange={setNewPassword}
+                autoComplete="new-password"
+              />
+              <PasswordField
+                label={t("confirm_password")}
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                autoComplete="new-password"
+              />
+              <Button type="submit" className="w-full mt-auto" disabled={passwordSaving}>
+                {passwordSaving ? "…" : t("save_changes")}
+              </Button>
+            </form>
+          </div>
         </Card>
 
         <Card className="h-full flex flex-col">
-          <h2 className="text-sm font-semibold text-app-text mb-4">{t("password_section_title")}</h2>
-          <form onSubmit={handleChangePassword} className="flex flex-col flex-1">
-            {passwordError && (
-              <div className="mb-4">
-                <ErrorBanner message={passwordError} />
-              </div>
-            )}
-            {passwordSuccess && <p className="text-sm text-app-success mb-4">{t("password_saved")}</p>}
-            <PasswordField
-              label={t("new_password")}
-              value={newPassword}
-              onChange={setNewPassword}
-              autoComplete="new-password"
-            />
-            <PasswordField
-              label={t("confirm_password")}
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-              autoComplete="new-password"
-            />
-            <Button type="submit" className="w-full mt-auto" disabled={passwordSaving}>
-              {passwordSaving ? "…" : t("save_changes")}
-            </Button>
-          </form>
+          <h2 className="text-sm font-semibold text-app-text mb-2">{t("currency_section_title")}</h2>
+          <p className="text-sm text-app-text-secondary mb-4">{t("currency_section_desc")}</p>
+          <div className="flex flex-col gap-2">
+            {CURRENCIES.map((option) => {
+              const active = currency === option.code;
+              return (
+                <button
+                  key={option.code}
+                  type="button"
+                  onClick={() => setCurrency(option.code)}
+                  className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
+                    active
+                      ? "border-app-accent bg-app-accent-soft text-app-text"
+                      : "border-app-border text-app-text-secondary hover:border-app-border-strong hover:text-app-text"
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    <span
+                      className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-base font-semibold ${
+                        active ? "bg-app-accent text-white" : "bg-glass-strong text-app-text-secondary"
+                      }`}
+                    >
+                      {option.symbol}
+                    </span>
+                    {t(option.labelKey)}
+                  </span>
+                  {active && <Check size={16} className="text-app-accent shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-app-text-muted mt-4">{t("currency_no_conversion_hint")}</p>
         </Card>
 
         <div className="space-y-6">

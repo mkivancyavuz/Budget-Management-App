@@ -9,6 +9,7 @@
 // swallow a click while it's on screen.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { playCashSound } from "@/lib/sound";
+import { CURRENCIES, useCurrency } from "@/lib/currency";
 
 // The overlay must outlive its slowest note, or late ones get cut off halfway
 // down the screen: MAX_DELAY + MAX_FALL is the floor for DURATION_MS.
@@ -29,13 +30,19 @@ interface Note {
   tone: string;
 }
 
-// Weighted by repetition — mostly currency signs, with the occasional banknote
-// and coin so the rain isn't uniform.
-const GLYPHS = ["$", "$", "$", "₺", "₺", "€", "💵", "💰", "🪙"];
 const TONES = ["#22c55e", "#16a34a", "#4ade80", "#86efac", "#facc15", "#fde047"];
 
 export function CashRain({ onDone }: { onDone: () => void }) {
   const [leaving, setLeaving] = useState(false);
+  const { currency } = useCurrency();
+
+  // The celebration shows whichever currency the user picked on their profile,
+  // so the sign raining down matches the figures on the dashboard.
+  const symbol = CURRENCIES.find((c) => c.code === currency)?.symbol ?? "₺";
+
+  // Weighted by repetition: mostly the active currency's sign, with the odd
+  // banknote and coin so the rain isn't uniform.
+  const glyphs = useMemo(() => [symbol, symbol, symbol, symbol, symbol, "💵", "💰", "🪙"], [symbol]);
 
   // Generated once per mount. This component only ever mounts in response to a
   // client-side event, so the randomness can't cause a hydration mismatch.
@@ -49,10 +56,12 @@ export function CashRain({ onDone }: { onDone: () => void }) {
         size: 14 + Math.random() * 30,
         spinFrom: Math.random() * 120 - 60,
         spinTo: Math.random() * 720 - 360,
-        glyph: GLYPHS[Math.floor(Math.random() * GLYPHS.length)],
+        glyph: glyphs[Math.floor(Math.random() * glyphs.length)],
         tone: TONES[Math.floor(Math.random() * TONES.length)],
       })),
-    []
+    // `glyphs` only changes if the currency does, which can't happen while this
+    // one-shot overlay is on screen — so the notes are still generated once.
+    [glyphs]
   );
 
   // Held in a ref so the effect below can have empty deps. `onDone` is usually
@@ -106,7 +115,7 @@ export function CashRain({ onDone }: { onDone: () => void }) {
 
       <div className="absolute inset-0 flex items-center justify-center">
         <span className="animate-jackpot-sign text-[28vw] sm:text-[20vw] leading-none font-bold text-app-success drop-shadow-[0_0_60px_rgba(34,197,94,0.55)]">
-          $
+          {symbol}
         </span>
       </div>
     </div>

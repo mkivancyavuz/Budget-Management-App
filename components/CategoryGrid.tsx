@@ -11,7 +11,7 @@ import {
   currentMonthKey,
   normalizeCategoryName,
 } from "@/lib/ledger";
-import { Card, ProgressBar, Badge, Button, ErrorBanner } from "./ui";
+import { Card, Badge, Button, ErrorBanner } from "./ui";
 import { Modal } from "./Modal";
 import type { Category } from "@/lib/types";
 
@@ -58,39 +58,29 @@ export function CategoryGrid() {
           <Badge>{monthLabel}</Badge>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
-          {categories.map((c) => {
-            const bal = monthTotals[c.id] ?? 0;
-            const target = c.monthlyTarget;
-            const pct = target > 0 ? (bal / target) * 100 : bal > 0 ? 100 : 0;
-            const overspent = bal < 0;
-            const underfunded = target > 0 && bal < target * 0.5 && !overspent;
-            const tone = overspent ? "bad" : underfunded ? "warn" : "good";
-
-            return (
-              <div key={c.id} className="rounded-xl border border-app-border p-4">
-                <div className="flex items-center justify-between mb-1 gap-2">
-                  <span className="text-sm font-medium text-app-text truncate">{categoryDisplayName(c, t)}</span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {overspent && <Badge tone="bad">{t("overspent")}</Badge>}
-                    {!overspent && underfunded && <Badge tone="warn">{t("underfunded")}</Badge>}
-                    <button
-                      onClick={() => setEditing(c)}
-                      aria-label={t("edit")}
-                      title={t("edit")}
-                      className="text-app-text-muted hover:text-app-text transition-colors p-1 rounded-lg hover:bg-glass-subtle"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                  </div>
-                </div>
-                <p className="text-lg font-semibold text-app-text mb-1">
-                  {formatCurrency(bal)}
-                  {target > 0 && <span className="text-sm font-normal text-app-text-muted"> / {formatCurrency(target)}</span>}
-                </p>
-                {target > 0 && <ProgressBar pct={pct} tone={tone} />}
+          {/* Each tile is simply "what this category cost this month". The old
+              "overspent"/"underfunded" badges and the progress bar compared the
+              figure against a monthly target, which made sense when this card
+              showed money *set aside* per category — now that it shows money
+              *spent*, a category with little spend was being labelled
+              "underfunded", which is backwards. Nothing in the app sets a
+              target any more either, so the comparison had no input. */}
+          {categories.map((c) => (
+            <div key={c.id} className="rounded-xl border border-app-border p-4">
+              <div className="flex items-center justify-between mb-1 gap-2">
+                <span className="text-sm font-medium text-app-text truncate">{categoryDisplayName(c, t)}</span>
+                <button
+                  onClick={() => setEditing(c)}
+                  aria-label={t("edit")}
+                  title={t("edit")}
+                  className="shrink-0 text-app-text-muted hover:text-app-text transition-colors p-1 rounded-lg hover:bg-glass-subtle"
+                >
+                  <Pencil size={14} />
+                </button>
               </div>
-            );
-          })}
+              <p className="text-lg font-semibold text-app-text">{formatCurrency(monthTotals[c.id] ?? 0)}</p>
+            </div>
+          ))}
           {categories.length === 0 && (
             <p className="text-sm text-app-text-muted col-span-full">{t("no_categories_yet")}</p>
           )}

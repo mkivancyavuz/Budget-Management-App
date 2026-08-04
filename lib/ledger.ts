@@ -247,7 +247,24 @@ export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-export function formatCurrency(amount: number, currency = "TRY"): string {
+export type CurrencyCode = "TRY" | "USD" | "EUR";
+
+// The display currency, held at module level so the ~30 formatCurrency() call
+// sites don't each have to thread it through. lib/currency.tsx owns the user's
+// choice and pushes it here; amounts themselves are stored as plain numbers and
+// are never converted — changing this only changes the symbol the figures are
+// shown with.
+let activeCurrency: CurrencyCode = "TRY";
+
+export function setActiveCurrency(currency: CurrencyCode): void {
+  activeCurrency = currency;
+}
+
+export function getActiveCurrency(): CurrencyCode {
+  return activeCurrency;
+}
+
+export function formatCurrency(amount: number, currency: CurrencyCode = activeCurrency): string {
   return new Intl.NumberFormat("tr-TR", {
     style: "currency",
     currency,
@@ -258,7 +275,7 @@ export function formatCurrency(amount: number, currency = "TRY"): string {
 /** Short form for tight spaces — "₺12,5B" instead of "₺12.500,00". Used for the
  * per-bar labels in the trend charts, where six full amounts can't fit across a
  * phone screen. */
-export function formatCurrencyCompact(amount: number, currency = "TRY"): string {
+export function formatCurrencyCompact(amount: number, currency: CurrencyCode = activeCurrency): string {
   return new Intl.NumberFormat("tr-TR", {
     style: "currency",
     currency,
