@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { LogOut, Trash2, Upload, Camera, Check } from "lucide-react";
+import { LogOut, Trash2, Upload, Camera, Check, Compass } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/i18n";
 import { CURRENCIES, useCurrency } from "@/lib/currency";
+import { useTour } from "@/lib/tour/TourProvider";
 import { AVATAR_COLORS, avatarInfo, displayIdentity } from "@/lib/profile";
 import { Card, Button, ErrorBanner } from "@/components/ui";
 import { Avatar } from "@/components/Avatar";
@@ -27,6 +28,7 @@ export default function ProfilePage() {
   const { user, signOut, refresh } = useAuth();
   const { t, lang } = useLanguage();
   const { currency, setCurrency } = useCurrency();
+  const { start: startTour } = useTour();
 
   const memberSince = user?.created_at
     ? new Intl.DateTimeFormat(lang === "tr" ? "tr-TR" : "en-US", { dateStyle: "long" }).format(
@@ -264,7 +266,7 @@ export default function ProfilePage() {
       {/* Account header spans the full width; the editing sections below sit
           in a responsive grid so wide monitors show two or three side by side
           instead of one narrow column hugging the left edge. */}
-      <Card>
+      <Card data-tour="profile-identity">
         <div className="flex items-center gap-5 min-w-0">
           <div className="relative shrink-0">
             <Avatar user={user} size={88} textClassName="text-3xl" />
@@ -355,7 +357,7 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        <Card className="h-full flex flex-col">
+        <Card className="h-full flex flex-col" data-tour="currency-card">
           <h2 className="text-sm font-semibold text-app-text mb-2">{t("currency_section_title")}</h2>
           <p className="text-sm text-app-text-secondary mb-4">{t("currency_section_desc")}</p>
           <div className="flex flex-col gap-2">
@@ -391,6 +393,15 @@ export default function ProfilePage() {
         </Card>
 
         <div className="space-y-6">
+          <Card>
+            <h2 className="text-sm font-semibold text-app-text mb-2">{t("tour_restart_title")}</h2>
+            <p className="text-sm text-app-text-secondary mb-4">{t("tour_restart_desc")}</p>
+            <Button variant="secondary" onClick={startTour} className="w-full">
+              <Compass size={14} />
+              {t("tour_restart_button")}
+            </Button>
+          </Card>
+
           <Card>
             <h2 className="text-sm font-semibold text-app-text mb-2">{t("sign_out_section_title")}</h2>
             <p className="text-sm text-app-text-secondary mb-4">{t("sign_out_desc")}</p>

@@ -42,14 +42,19 @@ export function Card({
   children,
   className = "",
   style,
+  // Forwarded so the onboarding tour can anchor to a card without the card
+  // knowing anything about the tour.
+  "data-tour": dataTour,
 }: {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
+  "data-tour"?: string;
 }) {
   return (
     <div
       style={style}
+      data-tour={dataTour}
       className={`animate-rise bg-glass backdrop-blur-xl border border-app-border rounded-3xl p-5 sm:p-6 transition-all duration-300 ease-out hover:-translate-y-[3px] hover:border-app-border-strong hover:bg-glass-hover ${className}`}
     >
       {children}

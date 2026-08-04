@@ -20,7 +20,7 @@ export default function HistoryPage() {
         <p className="text-sm text-app-text-secondary mt-1">{t("history_subtitle")}</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" data-tour="history-summary">
         <Card>
           <h3 className="text-sm font-medium text-app-text-secondary">{t("avg_monthly_income")}</h3>
           <p className="text-2xl font-bold tracking-tight text-app-text mt-1">

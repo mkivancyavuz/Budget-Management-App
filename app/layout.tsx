@@ -7,6 +7,8 @@ import { ThemeProvider, themeInitScript } from "@/lib/theme";
 import { CurrencyProvider } from "@/lib/currency";
 import { AuthProvider } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
+import { TourProvider } from "@/lib/tour/TourProvider";
+import { TourOverlay } from "@/components/tour/TourOverlay";
 import { SiteBackground } from "@/components/SiteBackground";
 import { SupabaseSetupNotice } from "@/components/SupabaseSetupNotice";
 
@@ -59,8 +61,11 @@ export default function RootLayout({
               <CurrencyProvider>
                 <AuthProvider>
                   <StoreProvider>
-                    <SiteBackground />
-                    <AppShell>{children}</AppShell>
+                    <TourProvider>
+                      <SiteBackground />
+                      <AppShell>{children}</AppShell>
+                      <TourOverlay />
+                    </TourProvider>
                   </StoreProvider>
                 </AuthProvider>
               </CurrencyProvider>

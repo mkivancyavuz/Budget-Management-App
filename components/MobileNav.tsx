@@ -75,7 +75,7 @@ export function MobileNav() {
           </div>
         </div>
       </div>
-      <nav className="flex gap-1.5 mt-3 overflow-x-auto">
+      <nav className="flex gap-1.5 mt-3 overflow-x-auto" data-tour="mobile-nav">
         {links.map((l) => {
           const Icon = l.icon;
           const active = pathname === l.href;

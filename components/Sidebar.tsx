@@ -41,7 +41,7 @@ export function Sidebar() {
         </p>
       </Link>
 
-      <nav className="flex flex-col gap-1">
+      <nav className="flex flex-col gap-1" data-tour="sidebar-nav">
         {links.map((l) => {
           const Icon = l.icon;
           const active = pathname === l.href;

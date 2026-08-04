@@ -45,7 +45,7 @@ export function CategoryGrid() {
   });
 
   return (
-    // The edit modal is rendered as a sibling of <Card>, not nested inside
+    // The edit modal is rendered as a sibling of <Card data-tour="expense-distribution">, not nested inside
     // it — Card uses the `animate-rise` entrance animation, which (via
     // animation-fill-mode: both) leaves a permanent `transform` applied
     // after it finishes. That turns Card into a containing block for

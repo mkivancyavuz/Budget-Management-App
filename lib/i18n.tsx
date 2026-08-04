@@ -298,6 +298,53 @@ const en: Dict = {
 
   pay_in_full: "Pay in Full",
   or_enter_amount: "or enter a specific amount",
+
+  // Onboarding tour
+  tour_progress: "Step {current} of {total}",
+  tour_next: "Next",
+  tour_back: "Back",
+  tour_skip: "Skip",
+  tour_finish: "Done",
+  tour_restart_title: "Guided tour",
+  tour_restart_desc: "Walk through the app again, step by step.",
+  tour_restart_button: "Restart tour",
+  tour_cash_title: "Start here: your available cash",
+  tour_cash_body:
+    "This is the money actually in your account. Every expense is measured against it — never against invoices you're still waiting on. Set it once from \"Set starting balance\"; it keeps itself up to date afterwards.",
+  tour_income_title: "Recording income",
+  tour_income_body:
+    "When a payment arrives, press this button: enter the amount, who it came from, and the date. Your available cash goes up by that amount.",
+  tour_expense_title: "Recording an expense",
+  tour_expense_body:
+    "Press here for anything you spend. Pick a category, type the amount, pick the date. If it's more than you have, the extra is written down as debt instead of being refused.",
+  tour_month_title: "The current month",
+  tour_month_body:
+    "These cards list this month's income and expenses. Both scroll, so nothing gets hidden once there are more than a few entries.",
+  tour_categories_title: "Setting up categories",
+  tour_categories_body:
+    "Open this to create the categories you spend on — rent, groceries, subscriptions — and to delete ones you no longer need. You pick one of these each time you record an expense.",
+  tour_distribution_title: "What each category cost",
+  tour_distribution_body:
+    "The amount spent per category this month. Typed a figure wrong? Press the pencil on a card and correct it; the difference is recorded, nothing is rewritten.",
+  tour_pie_title: "The split at a glance",
+  tour_pie_body: "The same figures as a chart, so the largest slice of the month is obvious immediately.",
+  tour_debt_title: "When you spend past your cash",
+  tour_debt_body:
+    "Spending beyond your available cash collects here rather than being blocked. Once money comes in, press \"Pay Off Debt\" — or \"Pay in Full\" to clear it in one go.",
+  tour_nav_title: "The other pages",
+  tour_nav_body: "Two more screens live here. We'll look at both next.",
+  tour_history_title: "Income History",
+  tour_history_body:
+    "Your month-by-month pattern: the average, plus your best and worst months. Useful for telling whether a quiet month is unusual or normal for you.",
+  tour_log_title: "Transaction Log",
+  tour_log_body:
+    "Every single entry, grouped by month, newest first. Nothing here is ever overwritten — this is the record everything else is calculated from.",
+  tour_profile_title: "Your profile",
+  tour_profile_body:
+    "Press the camera on the photo to change it, edit your username, change your password, or delete your account. Signing out is here too.",
+  tour_currency_title: "Currency",
+  tour_currency_body:
+    "Pick whether amounts appear in lira, dollars or euros. That's everything — you're ready to record your first income.",
 };
 
 const tr: Dict = {
@@ -579,6 +626,53 @@ const tr: Dict = {
 
   pay_in_full: "Tamamını Öde",
   or_enter_amount: "veya belirli bir tutar girin",
+
+  // Tanıtım turu
+  tour_progress: "{current}/{total}",
+  tour_next: "İleri",
+  tour_back: "Geri",
+  tour_skip: "Atla",
+  tour_finish: "Bitir",
+  tour_restart_title: "Tanıtım turu",
+  tour_restart_desc: "Uygulamayı baştan, adım adım gez.",
+  tour_restart_button: "Turu tekrar başlat",
+  tour_cash_title: "Buradan başlıyoruz: kullanılabilir nakdin",
+  tour_cash_body:
+    "Bu, hesabında gerçekten duran para. Her gider buna göre ölçülür, henüz tahsil edilmemiş alacaklara göre değil. Bir kez \"Başlangıç bakiyesi belirle\" ile girmen yeterli; sonrası kendiliğinden güncellenir.",
+  tour_income_title: "Gelir nasıl kaydedilir",
+  tour_income_body:
+    "Para geldiğinde bu butona bas: tutarı, kimden geldiğini ve tarihi gir. Kullanılabilir nakdin o tutar kadar artar.",
+  tour_expense_title: "Gider nasıl kaydedilir",
+  tour_expense_body:
+    "Harcadığın her şey için buraya bas. Kategori seç, tutarı yaz, tarihi seç. Eldeki paradan fazlaysa işlem reddedilmez; fazlası borç olarak yazılır.",
+  tour_month_title: "Bulunduğun ay",
+  tour_month_body:
+    "Bu kartlar bu ayın gelir ve giderlerini listeler. İkisi de kaydırılabilir, birkaç kayıttan fazlası olduğunda hiçbir şey gizlenmez.",
+  tour_categories_title: "Kategorileri kurmak",
+  tour_categories_body:
+    "Buradan harcama yaptığın kategorileri oluştur — kira, market, abonelikler — kullanmadıklarını da sil. Her gider kaydında bunlardan birini seçeceksin.",
+  tour_distribution_title: "Hangi kategori ne kadar tuttu",
+  tour_distribution_body:
+    "Bu ay kategori başına harcadığın tutar. Yanlış mı girdin? Kartın üzerindeki kaleme bas ve düzelt; aradaki fark kayıt olarak eklenir, hiçbir şey silinmez.",
+  tour_pie_title: "Dağılımı tek bakışta görmek",
+  tour_pie_body: "Aynı tutarların grafik hâli; ayın en büyük diliminin hangisi olduğu anında belli olur.",
+  tour_debt_title: "Eldeki paradan fazla harcayınca",
+  tour_debt_body:
+    "Kullanılabilir nakdinin üzerindeki harcamalar engellenmez, burada birikir. Para girdiğinde \"Borcu Öde\" ile ödersin — ya da \"Tamamını Öde\" ile tek seferde kapatırsın.",
+  tour_nav_title: "Diğer sayfalar",
+  tour_nav_body: "Burada iki sayfa daha var. Sırada ikisine de bakıyoruz.",
+  tour_history_title: "Gelir Geçmişi",
+  tour_history_body:
+    "Aylar arası tablon: ortalama, en iyi ve en kötü ayın. Sessiz bir ayın senin için olağandışı mı yoksa normal mi olduğunu anlamak için işine yarar.",
+  tour_log_title: "İşlem Kaydı",
+  tour_log_body:
+    "Bütün kayıtlar, aylara göre gruplanmış, en yenisi üstte. Buradaki hiçbir şey üzerine yazılmaz — diğer her şey bu kayıttan hesaplanır.",
+  tour_profile_title: "Profilin",
+  tour_profile_body:
+    "Fotoğrafın üzerindeki kameraya basarak değiştir, kullanıcı adını düzenle, şifreni değiştir ya da hesabını sil. Çıkış da burada.",
+  tour_currency_title: "Para birimi",
+  tour_currency_body:
+    "Tutarların lira, dolar mı euro mu görüneceğini buradan seç. Hepsi bu — ilk gelirini kaydetmeye hazırsın.",
 };
 
 const dictionaries: Record<Lang, Dict> = { en, tr };

@@ -172,18 +172,22 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        <Card className="sm:col-span-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" data-tour="month-lists">
+        <Card className="sm:col-span-1" data-tour="unused-cash">
           <h3 className="text-sm font-medium text-app-text-secondary">{t("unallocated_cash")}</h3>
           <p className="text-3xl font-bold tracking-tight text-app-text mt-1">
             <AnimatedCurrency value={free} />
           </p>
           <p className="text-xs text-app-text-muted mt-1">{t("unallocated_cash_hint")}</p>
           <div className="flex flex-wrap gap-2 mt-4">
-            <Button onClick={() => setModal("income")}>{t("log_income")}</Button>
-            <Button variant="secondary" onClick={() => setModal("allocate")}>
-              {t("allocate")}
-            </Button>
+            <span data-tour="log-income">
+              <Button onClick={() => setModal("income")}>{t("log_income")}</Button>
+            </span>
+            <span data-tour="log-expense">
+              <Button variant="secondary" onClick={() => setModal("allocate")}>
+                {t("allocate")}
+              </Button>
+            </span>
           </div>
         </Card>
 
@@ -241,9 +245,11 @@ export default function DashboardPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={() => setModal("manageCategories")}>
-          {t("manage_categories")}
-        </Button>
+        <span data-tour="manage-categories">
+          <Button variant="secondary" onClick={() => setModal("manageCategories")}>
+            {t("manage_categories")}
+          </Button>
+        </span>
         {hasAnyData && (
           <Button variant="danger" onClick={() => setConfirmClear(true)}>
             {t("clear_all_data")}
@@ -251,7 +257,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <Card>
+      <Card data-tour="debt-card">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h3 className="text-sm font-medium text-app-text-secondary">{t("credit_card_debt_title")}</h3>
@@ -268,7 +274,7 @@ export default function DashboardPage() {
 
       <CategoryGrid />
 
-      <Card>
+      <Card data-tour="category-pie">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium text-app-text-secondary">{t("category_pie_title")}</h3>
           <Badge>{currentMonthLabel}</Badge>

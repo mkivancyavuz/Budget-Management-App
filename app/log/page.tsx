@@ -98,7 +98,7 @@ export default function LogPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div data-tour="log-header">
           <h1 className="text-xl font-semibold text-app-text">{t("log_title")}</h1>
           <p className="text-sm text-app-text-secondary mt-1">{t("log_subtitle")}</p>
         </div>

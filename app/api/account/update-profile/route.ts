@@ -14,11 +14,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { fullName, username, avatarColor, avatarInitials } = (await request.json().catch(() => ({}))) as {
+  const { fullName, username, avatarColor, avatarInitials, tourCompletedAt } = (await request
+    .json()
+    .catch(() => ({}))) as {
     fullName?: string;
     username?: string;
     avatarColor?: string;
     avatarInitials?: string;
+    tourCompletedAt?: string | null;
   };
 
   const admin = createAdminClient();
@@ -43,6 +46,8 @@ export async function POST(request: Request) {
     nextMetadata.avatar_color = avatarColor;
   }
   if (avatarInitials !== undefined) nextMetadata.avatar_initials = avatarInitials.trim().slice(0, 2);
+  // Onboarding tour marker. Written both on finish and on skip.
+  if (tourCompletedAt !== undefined) nextMetadata.tour_completed_at = tourCompletedAt;
 
   const { data, error } = await admin.auth.admin.updateUserById(userId, { user_metadata: nextMetadata });
   if (error) {
