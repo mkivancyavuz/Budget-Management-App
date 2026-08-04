@@ -6,6 +6,7 @@ import { useLanguage } from "@/lib/i18n";
 import { BUFFER } from "@/lib/types";
 import { accountBalance, unallocatedCash, creditCardDebt, formatCurrency, categoryDisplayName } from "@/lib/ledger";
 import { Button, ErrorBanner } from "./ui";
+import { AmountInput } from "./AmountInput";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -24,7 +25,7 @@ const inputCls =
 export function IncomeForm({ onDone }: { onDone: () => void }) {
   const { logIncome } = useStore();
   const { t } = useLanguage();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(NaN);
   const [source, setSource] = useState("");
   const [date, setDate] = useState(todayStr());
   const [note, setNote] = useState("");
@@ -34,7 +35,7 @@ export function IncomeForm({ onDone }: { onDone: () => void }) {
     <form
       onSubmit={async (e) => {
         e.preventDefault();
-        const res = await logIncome({ amount: parseFloat(amount), source, date, note });
+        const res = await logIncome({ amount: amount, source, date, note });
         if (!res.ok) setError(res.error);
         else onDone();
       }}
@@ -45,7 +46,7 @@ export function IncomeForm({ onDone }: { onDone: () => void }) {
         </div>
       )}
       <Field label={t("amount_received")}>
-        <input className={`${inputCls} no-spinner`} type="number" inputMode="decimal" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("client_or_source")}>
         <input className={inputCls} type="text" required value={source} onChange={(e) => setSource(e.target.value)} placeholder="örn. Acme A.Ş." />
@@ -71,7 +72,7 @@ export function AllocateForm({ onDone }: { onDone: () => void }) {
   // Starts empty on purpose — pre-filling the first category made it easy to
   // log an expense against the wrong one without noticing.
   const [categoryName, setCategoryName] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(NaN);
   const [date, setDate] = useState(todayStr());
   const [error, setError] = useState<string | null>(null);
 
@@ -89,7 +90,7 @@ export function AllocateForm({ onDone }: { onDone: () => void }) {
           setError(t("err_category_not_found"));
           return;
         }
-        const res = await allocate({ categoryId, amount: parseFloat(amount), date });
+        const res = await allocate({ categoryId, amount: amount, date });
         if (!res.ok) setError(res.error);
         else onDone();
       }}
@@ -119,7 +120,7 @@ export function AllocateForm({ onDone }: { onDone: () => void }) {
         </datalist>
       </Field>
       <Field label={t("amount_to_allocate")}>
-        <input className={`${inputCls} no-spinner`} type="number" inputMode="decimal" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("date")}>
         {/* Same rule as income: an expense is recorded once it has happened,
@@ -137,7 +138,7 @@ export function TransferForm({ onDone }: { onDone: () => void }) {
   const categories = state.categories.filter((c) => !c.archived);
   const [fromId, setFromId] = useState(categories[0]?.id ?? "");
   const [toId, setToId] = useState(categories[1]?.id ?? categories[0]?.id ?? "");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(NaN);
   const [date, setDate] = useState(todayStr());
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +148,7 @@ export function TransferForm({ onDone }: { onDone: () => void }) {
     <form
       onSubmit={async (e) => {
         e.preventDefault();
-        const res = await transferBetween({ fromCategoryId: fromId, toCategoryId: toId, amount: parseFloat(amount), date, note });
+        const res = await transferBetween({ fromCategoryId: fromId, toCategoryId: toId, amount: amount, date, note });
         if (!res.ok) setError(res.error);
         else onDone();
       }}
@@ -177,7 +178,7 @@ export function TransferForm({ onDone }: { onDone: () => void }) {
         </select>
       </Field>
       <Field label={t("amount")}>
-        <input className={inputCls} type="number" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("date")}>
         <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
@@ -195,7 +196,7 @@ export function SpendForm({ onDone }: { onDone: () => void }) {
   const { t } = useLanguage();
   const categories = state.categories.filter((c) => !c.archived);
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(NaN);
   const [date, setDate] = useState(todayStr());
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -206,7 +207,7 @@ export function SpendForm({ onDone }: { onDone: () => void }) {
     <form
       onSubmit={async (e) => {
         e.preventDefault();
-        const res = await spend({ categoryId, amount: parseFloat(amount), date, note });
+        const res = await spend({ categoryId, amount: amount, date, note });
         if (!res.ok) setError(res.error);
         else onDone();
       }}
@@ -227,7 +228,7 @@ export function SpendForm({ onDone }: { onDone: () => void }) {
         </select>
       </Field>
       <Field label={t("amount_spent")}>
-        <input className={inputCls} type="number" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("date")}>
         <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
@@ -245,7 +246,7 @@ export function BufferDrawForm({ onDone }: { onDone: () => void }) {
   const { t } = useLanguage();
   const categories = state.categories.filter((c) => !c.archived && !c.isBuffer);
   const [toName, setToName] = useState(categories[0]?.name ?? "");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(NaN);
   const [date, setDate] = useState(todayStr());
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -265,7 +266,7 @@ export function BufferDrawForm({ onDone }: { onDone: () => void }) {
           setError(t("err_category_not_found"));
           return;
         }
-        const res = await bufferDraw({ toCategoryId: toId, amount: parseFloat(amount), date, reason });
+        const res = await bufferDraw({ toCategoryId: toId, amount: amount, date, reason });
         if (!res.ok) setError(res.error);
         else onDone();
       }}
@@ -293,7 +294,7 @@ export function BufferDrawForm({ onDone }: { onDone: () => void }) {
         </datalist>
       </Field>
       <Field label={t("amount_to_draw")}>
-        <input className={inputCls} type="number" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("date")}>
         <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
@@ -310,7 +311,7 @@ export function BufferContributeForm({ onDone }: { onDone: () => void }) {
   const { state, bufferContribute } = useStore();
   const { t } = useLanguage();
   const free = unallocatedCash(state.transactions);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(NaN);
   const [date, setDate] = useState(todayStr());
   const [error, setError] = useState<string | null>(null);
 
@@ -318,7 +319,7 @@ export function BufferContributeForm({ onDone }: { onDone: () => void }) {
     <form
       onSubmit={async (e) => {
         e.preventDefault();
-        const res = await bufferContribute({ amount: parseFloat(amount), date });
+        const res = await bufferContribute({ amount: amount, date });
         if (!res.ok) setError(res.error);
         else onDone();
       }}
@@ -330,7 +331,7 @@ export function BufferContributeForm({ onDone }: { onDone: () => void }) {
         </div>
       )}
       <Field label={t("amount_to_contribute")}>
-        <input className={inputCls} type="number" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("date")}>
         <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
@@ -371,7 +372,7 @@ export function CategoryForm({ onDone }: { onDone: () => void }) {
 export function InitialBalanceForm({ onDone }: { onDone: () => void }) {
   const { setInitialBalance } = useStore();
   const { t } = useLanguage();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(NaN);
   const [date, setDate] = useState(todayStr());
   const [error, setError] = useState<string | null>(null);
 
@@ -379,7 +380,7 @@ export function InitialBalanceForm({ onDone }: { onDone: () => void }) {
     <form
       onSubmit={async (e) => {
         e.preventDefault();
-        const res = await setInitialBalance(parseFloat(amount), date);
+        const res = await setInitialBalance(amount, date);
         if (!res.ok) setError(res.error);
         else onDone();
       }}
@@ -391,7 +392,7 @@ export function InitialBalanceForm({ onDone }: { onDone: () => void }) {
         </div>
       )}
       <Field label={t("current_account_balance")}>
-        <input className={inputCls} type="number" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        <AmountInput value={amount} onChange={setAmount} required />
       </Field>
       <Field label={t("as_of_date")}>
         <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
@@ -406,7 +407,7 @@ export function PayCreditCardForm({ onDone }: { onDone: () => void }) {
   const { t } = useLanguage();
   const free = unallocatedCash(state.transactions);
   const debt = creditCardDebt(state.transactions);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number>(NaN);
   const [date, setDate] = useState(todayStr());
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -442,13 +443,13 @@ export function PayCreditCardForm({ onDone }: { onDone: () => void }) {
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          const res = await payCreditCard({ amount: parseFloat(amount), date, note });
+          const res = await payCreditCard({ amount: amount, date, note });
           if (!res.ok) setError(res.error);
           else onDone();
         }}
       >
         <Field label={t("amount_to_pay")}>
-          <input className={`${inputCls} no-spinner`} type="number" inputMode="decimal" step="0.01" min="0" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+          <AmountInput value={amount} onChange={setAmount} required />
         </Field>
         <Field label={t("date")}>
           <input className={inputCls} type="date" required value={date} onChange={(e) => setDate(e.target.value)} />

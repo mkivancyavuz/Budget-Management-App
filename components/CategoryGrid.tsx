@@ -13,6 +13,7 @@ import {
 } from "@/lib/ledger";
 import { Card, Badge, Button, ErrorBanner } from "./ui";
 import { Modal } from "./Modal";
+import { AmountInput } from "./AmountInput";
 import type { Category } from "@/lib/types";
 
 const inputCls =
@@ -131,7 +132,7 @@ function EditCategoryModal({
 }) {
   const { t } = useLanguage();
   const [name, setName] = useState(categoryDisplayName(category, t));
-  const [amount, setAmount] = useState(String(currentAmount));
+  const [amount, setAmount] = useState<number>(currentAmount);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -150,8 +151,8 @@ function EditCategoryModal({
       setError(t("err_category_exists", { name: clash.label }));
       return;
     }
-    const parsed = parseFloat(amount);
-    if (Number.isNaN(parsed) || parsed < 0) {
+    const parsed = amount;
+    if (!Number.isFinite(parsed) || parsed < 0) {
       setError(t("err_target_negative"));
       return;
     }
@@ -179,15 +180,7 @@ function EditCategoryModal({
           />
         </Field>
         <Field label={t("category_paid_amount")}>
-          <input
-            className={inputCls}
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-          />
+          <AmountInput value={amount} onChange={setAmount} />
         </Field>
         <Button type="submit" className="w-full mt-1" disabled={saving}>
           {saving ? "…" : t("save_changes")}
