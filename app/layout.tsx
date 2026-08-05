@@ -9,6 +9,7 @@ import { AuthProvider } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 import { TourProvider } from "@/lib/tour/TourProvider";
 import { TourOverlay } from "@/components/tour/TourOverlay";
+import { AssistantBubble } from "@/components/assistant/AssistantBubble";
 import { SiteBackground } from "@/components/SiteBackground";
 import { SupabaseSetupNotice } from "@/components/SupabaseSetupNotice";
 
@@ -64,6 +65,7 @@ export default function RootLayout({
                     <TourProvider>
                       <SiteBackground />
                       <AppShell>{children}</AppShell>
+                      <AssistantBubble />
                       <TourOverlay />
                     </TourProvider>
                   </StoreProvider>

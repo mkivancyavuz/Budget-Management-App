@@ -105,6 +105,22 @@ create index if not exists sessions_user_id_idx on public.sessions (user_id);
 
 alter table public.sessions enable row level security;
 
+-- Daily message counter for the AI assistant, one row per account per day.
+--
+-- Anyone can register, so an uncapped assistant would let a single account run
+-- up the API bill. The route refuses to call the model once the day's count is
+-- reached. RLS is enabled with no policies, so only the service-role key (used
+-- exclusively server-side) can read or write this — a browser can't inflate or
+-- reset its own allowance.
+create table if not exists public.assistant_usage (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  day date not null,
+  message_count integer not null default 0,
+  primary key (user_id, day)
+);
+
+alter table public.assistant_usage enable row level security;
+
 -- Storage bucket for uploaded profile photos. Public-read so an <img> tag can
 -- load the avatar without a signed URL, but writes only ever happen
 -- server-side through app/api/account/avatar (service-role key), which files

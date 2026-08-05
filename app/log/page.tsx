@@ -1,17 +1,22 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useStore } from "@/lib/store";
 import { useLanguage } from "@/lib/i18n";
+import { useCurrency } from "@/lib/currency";
 import {
   formatCurrency,
   totalCashOnHand,
   categoryDisplayName,
   renderTransactionLabel,
   expenseSignedAmount,
+  currentMonthKey,
 } from "@/lib/ledger";
-import { Card, Badge } from "@/components/ui";
+import { Card, Badge, Button, ErrorBanner } from "@/components/ui";
 import { AnimatedCurrency } from "@/components/AnimatedNumber";
+import { MonthField } from "@/components/MonthField";
+import { formatYmd, todayYmd, daysInMonth } from "@/lib/calendar";
+import { Download, Loader2 } from "lucide-react";
 
 const typeKey: Record<string, string> = {
   initial_balance: "type_initial_balance",
@@ -38,7 +43,78 @@ const typeTone: Record<string, "default" | "good" | "warn" | "bad"> = {
 export default function LogPage() {
   const { state } = useStore();
   const { t, lang } = useLanguage();
+  const { currency } = useCurrency();
   const categories = state.categories;
+
+  // Export range is picked by whole month — "Ağustos 2026" rather than an
+  // exact day — since a report almost always means "this month" or "last
+  // month", and stepping through months is quicker than a day-level
+  // calendar for that. Defaults to "this month" on both ends.
+  const today = todayYmd();
+  const todayStr = formatYmd(today);
+  const thisMonthKey = currentMonthKey();
+  const [exportFromMonth, setExportFromMonth] = useState(thisMonthKey);
+  const [exportToMonth, setExportToMonth] = useState(thisMonthKey);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState("");
+
+  // The actual yyyy-mm-dd range sent to the server: the 1st of the start
+  // month through either the end month's last day, or today if the end
+  // month is the current (still in-progress) one — a month that hasn't
+  // finished yet can't report on days that haven't happened.
+  const exportFrom = `${exportFromMonth}-01`;
+  const exportTo =
+    exportToMonth === thisMonthKey
+      ? todayStr
+      : (() => {
+          const [y, m] = exportToMonth.split("-").map(Number);
+          return formatYmd({ year: y, month: m, day: daysInMonth(y, m) });
+        })();
+
+  async function handleExport() {
+    // The date fields already clamp against each other and against today via
+    // min/max, but that only stops new invalid picks — it doesn't retroactively
+    // fix a range left over from before the other field moved. Checking again
+    // here is what actually keeps a bad request from ever reaching the server.
+    if (exportFrom > exportTo) {
+      setExportError(t("log_export_range_invalid"));
+      return;
+    }
+    if (exportTo > todayStr) {
+      setExportError(t("log_export_future_date"));
+      return;
+    }
+
+    setExportError("");
+    setExportLoading(true);
+    try {
+      const res = await fetch("/api/export/transactions-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from: exportFrom, to: exportTo, lang, currency }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        if (body.error === "range_reversed") setExportError(t("log_export_range_invalid"));
+        else if (body.error === "future_date") setExportError(t("log_export_future_date"));
+        else setExportError(t("log_export_error"));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `islem-ozeti_${exportFrom}_${exportTo}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError(t("log_export_error"));
+    } finally {
+      setExportLoading(false);
+    }
+  }
   const sorted = state.transactions
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
@@ -109,6 +185,42 @@ export default function LogPage() {
           </p>
         </Card>
       </div>
+
+      <Card>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-app-text mb-2">{t("log_export_title")}</h2>
+            <div className="flex flex-wrap items-start gap-3">
+              <div className="w-44">
+                <label className="block text-xs text-app-text-muted mb-1">{t("log_export_from")}</label>
+                <MonthField value={exportFromMonth} onChange={setExportFromMonth} max={exportToMonth} />
+              </div>
+              <div className="w-44">
+                <label className="block text-xs text-app-text-muted mb-1">{t("log_export_to")}</label>
+                <MonthField value={exportToMonth} onChange={setExportToMonth} min={exportFromMonth} max={thisMonthKey} />
+              </div>
+            </div>
+          </div>
+          <Button variant="secondary" onClick={handleExport} disabled={exportLoading} className="ml-auto">
+            {exportLoading ? (
+              <>
+                <Loader2 size={15} className="animate-spin" />
+                {t("log_export_generating")}
+              </>
+            ) : (
+              <>
+                <Download size={15} />
+                {t("log_export_button")}
+              </>
+            )}
+          </Button>
+        </div>
+        {exportError && (
+          <div className="mt-3">
+            <ErrorBanner message={exportError} />
+          </div>
+        )}
+      </Card>
 
       {months.length === 0 && (
         <Card>
